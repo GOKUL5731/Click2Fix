@@ -1,0 +1,6 @@
+﻿node_modules/
+.runtime/
+.venv/
+build/
+.dart_tool/
+android/.gradle/
