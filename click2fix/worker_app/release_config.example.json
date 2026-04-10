@@ -1,0 +1,6 @@
+{
+  "API_BASE_URL": "https://api.your-click2fix-domain.com",
+  "SOCKET_URL": "https://api.your-click2fix-domain.com",
+  "ENVIRONMENT": "production"
+}
+

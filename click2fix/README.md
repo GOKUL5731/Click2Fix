@@ -101,7 +101,7 @@ cd ../worker_app
 flutter create . --platforms android,ios,web
 ```
 
-2. Android key setup in both apps:
+2. Android key setup in both apps:  
 Add this inside `<application>` in `android/app/src/main/AndroidManifest.xml`:
 
 ```xml
@@ -110,7 +110,7 @@ Add this inside `<application>` in `android/app/src/main/AndroidManifest.xml`:
     android:value="YOUR_GOOGLE_MAPS_API_KEY" />
 ```
 
-3. iOS key setup in both apps:
+3. iOS key setup in both apps:  
 In `ios/Runner/AppDelegate.swift`, add:
 
 ```swift
@@ -123,13 +123,15 @@ and call:
 GMSServices.provideAPIKey("YOUR_GOOGLE_MAPS_API_KEY")
 ```
 
-4. Web key setup in both apps:
+4. Web key setup in both apps:  
 In `web/index.html`, include the Google Maps JavaScript SDK script tag with your key.
 
 5. Run with Dart defines:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://localhost:8080 --dart-define=GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
+flutter run \
+  --dart-define=API_BASE_URL=http://localhost:8080 \
+  --dart-define=GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
 ```
 
 ## Firebase Backend and Notifications
@@ -148,14 +150,20 @@ FIREBASE_DATABASE_URL=
 
 2. Use Firebase login endpoint:
 
-- `POST /auth/firebase-login` with `{ "role": "user" | "worker", "idToken": "<firebase-id-token>" }`
+- `POST /auth/firebase-login` with:
+  ```json
+  {
+    "role": "user",
+    "idToken": "<firebase-id-token>"
+  }
+  ```
 
 3. Register device tokens after login:
 
 - `POST /notifications/register-token`
 - `POST /notifications/unregister-token`
 
-4. Send test push to the logged-in actor:
+4. Send a test push to the logged-in actor:
 
 - `POST /notifications/send-test`
 
@@ -169,3 +177,27 @@ FIREBASE_DATABASE_URL=
   - `FIREBASE_WEB_MESSAGING_SENDER_ID`
   - `FIREBASE_WEB_PROJECT_ID`
 
+Example:
+
+```bash
+flutter run \
+  --dart-define=API_BASE_URL=http://localhost:8080 \
+  --dart-define=GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY \
+  --dart-define=FIREBASE_WEB_API_KEY=YOUR_FIREBASE_WEB_API_KEY \
+  --dart-define=FIREBASE_WEB_APP_ID=YOUR_FIREBASE_WEB_APP_ID \
+  --dart-define=FIREBASE_WEB_MESSAGING_SENDER_ID=YOUR_FIREBASE_WEB_MESSAGING_SENDER_ID \
+  --dart-define=FIREBASE_WEB_PROJECT_ID=YOUR_FIREBASE_WEB_PROJECT_ID
+```
+
+## Build Installable Apps
+
+After deploying a public HTTPS backend and installing Flutter:
+
+```powershell
+./scripts/build_release.ps1 `
+  -ApiBaseUrl https://api.your-click2fix-domain.com `
+  -SocketUrl https://api.your-click2fix-domain.com `
+  -UserAndroidApk
+```
+
+See `docs/release/distribution_guide.md` for Android APK/AAB, Windows, iOS, and admin web distribution steps.
