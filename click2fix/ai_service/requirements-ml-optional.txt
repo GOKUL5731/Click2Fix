@@ -1,0 +1,7 @@
+# Optional heavy ML dependencies for production model serving.
+# Install only in GPU/ML environments after validating platform wheels.
+tensorflow
+torch
+torchvision
+deepface
+

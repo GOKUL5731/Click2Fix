@@ -1,0 +1,20 @@
+import type { Request, Response } from 'express';
+import { asyncHandler } from '../middleware/error';
+import * as authService from '../services/auth.service';
+
+export const register = asyncHandler(async (req: Request, res: Response) => {
+  res.status(201).json(await authService.register(req.body));
+});
+
+export const login = asyncHandler(async (req: Request, res: Response) => {
+  res.json(await authService.login(req.body));
+});
+
+export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
+  res.json(await authService.verifyOtp(req.body));
+});
+
+export const logout = asyncHandler(async (_req: Request, res: Response) => {
+  res.json(await authService.logout());
+});
+

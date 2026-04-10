@@ -1,0 +1,7 @@
+class AppConfig {
+  static const appName = 'Click2Fix';
+  static const tagline = 'Click the problem. Fix it instantly.';
+  static const apiBaseUrl = String.fromEnvironment('API_BASE_URL', defaultValue: 'http://localhost:8080');
+  static const socketUrl = String.fromEnvironment('SOCKET_URL', defaultValue: 'http://localhost:8080');
+}
+
