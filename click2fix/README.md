@@ -88,3 +88,12 @@ docker compose up --build
 
 Flutter apps are intentionally lightweight scaffolds. Create full Flutter platforms with `flutter create .` inside each app folder before running on device, then keep the existing `lib/` files.
 
+## Build Installable Apps
+
+After deploying a public HTTPS backend and installing Flutter:
+
+```powershell
+./scripts/build_release.ps1 -ApiBaseUrl https://api.your-click2fix-domain.com -SocketUrl https://api.your-click2fix-domain.com -UserAndroidApk
+```
+
+See `docs/release/distribution_guide.md` for Android APK/AAB, Windows, iOS, and admin web distribution steps.
