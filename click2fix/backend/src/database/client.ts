@@ -9,7 +9,14 @@ export const pool = new Pool({
 });
 
 export const redis = new Redis(config.redisUrl, {
+  lazyConnect: true,
   maxRetriesPerRequest: 2
+});
+
+redis.on('error', (error) => {
+  if (config.nodeEnv !== 'test') {
+    console.warn(`Redis unavailable: ${error.message}`);
+  }
 });
 
 export async function query<T extends QueryResultRow = QueryResultRow>(
