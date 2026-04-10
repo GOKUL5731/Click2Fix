@@ -2,6 +2,7 @@ import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { query, redis } from '../database/client';
 import { httpError } from '../middleware/error';
+import { sendPushToActor } from './notification.service';
 
 export const createBookingSchema = z.object({
   issueId: z.string().uuid(),
@@ -30,6 +31,18 @@ export async function createBooking(userId: string, input: z.infer<typeof create
   }
 
   await query("UPDATE issues SET status = 'booked' WHERE id = $1", [input.issueId]);
+
+  void sendPushToActor('worker', input.workerId, {
+    title: 'New booking confirmed',
+    message: 'A user confirmed your quote. Open the app to start navigation.',
+    data: { bookingId: result.rows[0].id as string, issueId: input.issueId }
+  });
+
+  void sendPushToActor('user', userId, {
+    title: 'Booking confirmed',
+    message: 'Your worker has been assigned. You can track live location now.',
+    data: { bookingId: result.rows[0].id as string, workerId: input.workerId }
+  });
 
   return {
     booking: result.rows[0],
@@ -105,6 +118,20 @@ export async function completeBooking(input: z.infer<typeof completeBookingSchem
     [input.bookingId]
   );
 
-  return result.rows[0];
+  const completedBooking = result.rows[0] as { id: string; user_id: string; worker_id: string };
+
+  void sendPushToActor('user', completedBooking.user_id, {
+    title: 'Booking completed',
+    message: 'Your service has been marked as completed. Please add a review.',
+    data: { bookingId: completedBooking.id }
+  });
+
+  void sendPushToActor('worker', completedBooking.worker_id, {
+    title: 'Job completed',
+    message: 'Booking completed successfully. Check wallet and payout details.',
+    data: { bookingId: completedBooking.id }
+  });
+
+  return completedBooking;
 }
 

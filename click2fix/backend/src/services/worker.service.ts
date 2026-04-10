@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { query, redis } from '../database/client';
 import type { NearbyWorker } from '../models/types';
 import { httpError } from '../middleware/error';
+import { sendPushToActor } from './notification.service';
 
 export const nearbyWorkerQuerySchema = z.object({
   issueId: z.string().uuid().optional(),
@@ -102,7 +103,9 @@ export async function findNearbyWorkers(input: z.infer<typeof nearbyWorkerQueryS
 }
 
 export async function sendQuote(workerId: string, input: z.infer<typeof sendQuoteSchema>) {
-  const issue = await query('SELECT id, status FROM issues WHERE id = $1', [input.issueId]);
+  const issue = await query<{ id: string; status: string; user_id: string }>('SELECT id, status, user_id FROM issues WHERE id = $1', [
+    input.issueId
+  ]);
   if (!issue.rows[0]) {
     throw httpError(404, 'Issue not found');
   }
@@ -120,6 +123,13 @@ export async function sendQuote(workerId: string, input: z.infer<typeof sendQuot
   );
 
   await query("UPDATE issues SET status = 'quoted' WHERE id = $1", [input.issueId]);
+
+  void sendPushToActor('user', issue.rows[0].user_id, {
+    title: 'New worker quote received',
+    message: 'A worker has sent a quote for your issue. Compare and confirm booking.',
+    data: { issueId: input.issueId, workerId }
+  });
+
   return result.rows[0];
 }
 

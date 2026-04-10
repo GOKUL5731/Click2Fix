@@ -5,6 +5,7 @@ import { config } from '../config';
 import { query, redis } from '../database/client';
 import type { ActorRole, AuthTokenPayload } from '../models/types';
 import { httpError } from '../middleware/error';
+import { verifyFirebaseIdToken } from './firebase-auth.service';
 
 const otpMemoryStore = new Map<string, { otp: string; expiresAt: number }>();
 
@@ -33,9 +34,20 @@ export const verifyOtpSchema = z.object({
   deviceId: z.string().max(180).optional()
 });
 
+export const firebaseLoginSchema = z.object({
+  role: z.enum(['user', 'worker']).default('user'),
+  idToken: z.string().min(20),
+  phone: z.string().min(8).max(20).optional(),
+  name: z.string().min(2).max(120).optional(),
+  category: z.string().max(80).optional(),
+  experience: z.number().int().min(0).max(60).optional(),
+  deviceId: z.string().max(180).optional()
+});
+
 type RegisterInput = z.infer<typeof registerSchema>;
 type LoginInput = z.infer<typeof loginSchema>;
 type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
+type FirebaseLoginInput = z.infer<typeof firebaseLoginSchema>;
 
 function otpKey(role: ActorRole, phone: string) {
   return `otp:${role}:${phone}`;
@@ -190,6 +202,62 @@ export async function verifyOtp(input: VerifyOtpInput) {
   });
 
   return { token, role: input.role, accountId: account.id };
+}
+
+export async function firebaseLogin(input: FirebaseLoginInput) {
+  const identity = await verifyFirebaseIdToken(input.idToken);
+  const phone = input.phone ?? identity.phone;
+
+  if (!phone) {
+    throw httpError(400, 'Firebase login requires a phone number. Provide phone in request if token does not contain phone_number.');
+  }
+
+  if (input.role === 'worker') {
+    const result = await query<{ id: string; phone: string }>(
+      `INSERT INTO workers (name, phone, category, experience)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (phone) DO UPDATE
+       SET name = COALESCE(EXCLUDED.name, workers.name),
+           category = COALESCE(EXCLUDED.category, workers.category),
+           experience = EXCLUDED.experience
+       RETURNING id, phone`,
+      [input.name ?? identity.name ?? 'Worker', phone, input.category ?? null, input.experience ?? 0]
+    );
+
+    const account = result.rows[0];
+    const token = signToken({
+      sub: account.id,
+      role: 'worker',
+      phone: account.phone,
+      deviceId: input.deviceId,
+      firebaseUid: identity.uid
+    });
+
+    return { token, role: 'worker', accountId: account.id, firebaseUid: identity.uid };
+  }
+
+  const userResult = await query<{ id: string; phone: string; email: string | null }>(
+    `INSERT INTO users (name, phone, email, profile_photo)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (phone) DO UPDATE
+     SET name = COALESCE(EXCLUDED.name, users.name),
+         email = COALESCE(EXCLUDED.email, users.email),
+         profile_photo = COALESCE(EXCLUDED.profile_photo, users.profile_photo)
+     RETURNING id, phone, email`,
+    [input.name ?? identity.name ?? null, phone, identity.email ?? null, identity.picture ?? null]
+  );
+
+  const user = userResult.rows[0];
+  const token = signToken({
+    sub: user.id,
+    role: 'user',
+    phone: user.phone,
+    email: user.email ?? identity.email,
+    deviceId: input.deviceId,
+    firebaseUid: identity.uid
+  });
+
+  return { token, role: 'user', accountId: user.id, firebaseUid: identity.uid };
 }
 
 export async function logout() {

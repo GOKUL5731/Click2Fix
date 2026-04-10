@@ -88,3 +88,84 @@ docker compose up --build
 
 Flutter apps are intentionally lightweight scaffolds. Create full Flutter platforms with `flutter create .` inside each app folder before running on device, then keep the existing `lib/` files.
 
+## Google Maps Setup (Mobile and Worker Apps)
+
+Google Maps widgets are integrated in `mobile_app` and `worker_app` using `google_maps_flutter`.
+
+1. Generate platform folders if they are missing:
+
+```bash
+cd mobile_app
+flutter create . --platforms android,ios,web
+cd ../worker_app
+flutter create . --platforms android,ios,web
+```
+
+2. Android key setup in both apps:
+Add this inside `<application>` in `android/app/src/main/AndroidManifest.xml`:
+
+```xml
+<meta-data
+    android:name="com.google.android.geo.API_KEY"
+    android:value="YOUR_GOOGLE_MAPS_API_KEY" />
+```
+
+3. iOS key setup in both apps:
+In `ios/Runner/AppDelegate.swift`, add:
+
+```swift
+import GoogleMaps
+```
+
+and call:
+
+```swift
+GMSServices.provideAPIKey("YOUR_GOOGLE_MAPS_API_KEY")
+```
+
+4. Web key setup in both apps:
+In `web/index.html`, include the Google Maps JavaScript SDK script tag with your key.
+
+5. Run with Dart defines:
+
+```bash
+flutter run --dart-define=API_BASE_URL=http://localhost:8080 --dart-define=GOOGLE_MAPS_API_KEY=YOUR_GOOGLE_MAPS_API_KEY
+```
+
+## Firebase Backend and Notifications
+
+Backend now supports Firebase Auth login and FCM push delivery.
+
+1. Set backend env variables in `backend/.env`:
+
+```bash
+FIREBASE_PROJECT_ID=your-project-id
+FIREBASE_CLIENT_EMAIL=firebase-adminsdk-xxx@your-project-id.iam.gserviceaccount.com
+FIREBASE_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\n...\n-----END PRIVATE KEY-----\n"
+FIREBASE_STORAGE_BUCKET=your-project-id.appspot.com
+FIREBASE_DATABASE_URL=
+```
+
+2. Use Firebase login endpoint:
+
+- `POST /auth/firebase-login` with `{ "role": "user" | "worker", "idToken": "<firebase-id-token>" }`
+
+3. Register device tokens after login:
+
+- `POST /notifications/register-token`
+- `POST /notifications/unregister-token`
+
+4. Send test push to the logged-in actor:
+
+- `POST /notifications/send-test`
+
+5. Flutter app setup for notifications (`mobile_app` and `worker_app`):
+
+- Add Android file: `android/app/google-services.json`
+- Add iOS file: `ios/Runner/GoogleService-Info.plist`
+- For web, pass these Dart defines:
+  - `FIREBASE_WEB_API_KEY`
+  - `FIREBASE_WEB_APP_ID`
+  - `FIREBASE_WEB_MESSAGING_SENDER_ID`
+  - `FIREBASE_WEB_PROJECT_ID`
+

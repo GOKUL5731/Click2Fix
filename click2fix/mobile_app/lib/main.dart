@@ -3,8 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'config/app_routes.dart';
 import 'config/app_theme.dart';
+import 'services/push_notification_service.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await PushNotificationService().initialize();
   runApp(const ProviderScope(child: Click2FixUserApp()));
 }
 
@@ -22,4 +25,3 @@ class Click2FixUserApp extends ConsumerWidget {
     );
   }
 }
-

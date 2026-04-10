@@ -197,6 +197,18 @@ CREATE TABLE IF NOT EXISTS notifications (
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  actor_role user_role NOT NULL,
+  actor_id UUID NOT NULL,
+  fcm_token TEXT NOT NULL UNIQUE,
+  platform VARCHAR(20) NOT NULL DEFAULT 'unknown',
+  app_variant VARCHAR(20) NOT NULL DEFAULT 'mobile',
+  is_active BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 CREATE TABLE IF NOT EXISTS chat_messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
@@ -296,6 +308,8 @@ CREATE INDEX IF NOT EXISTS idx_bookings_user ON bookings(user_id, created_at DES
 CREATE INDEX IF NOT EXISTS idx_bookings_worker ON bookings(worker_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_user ON notifications(user_id, is_read, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_notifications_worker ON notifications(worker_id, is_read, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_actor ON device_tokens(actor_role, actor_id, is_active);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_active ON device_tokens(is_active, updated_at DESC);
 CREATE INDEX IF NOT EXISTS idx_chat_booking ON chat_messages(booking_id, created_at ASC);
 CREATE INDEX IF NOT EXISTS idx_fraud_status ON fraud_alerts(status, risk_score DESC);
 
@@ -334,5 +348,10 @@ END $$;
 
 DO $$ BEGIN
   CREATE TRIGGER trg_complaints_updated_at BEFORE UPDATE ON complaints FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+DO $$ BEGIN
+  CREATE TRIGGER trg_device_tokens_updated_at BEFORE UPDATE ON device_tokens FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;

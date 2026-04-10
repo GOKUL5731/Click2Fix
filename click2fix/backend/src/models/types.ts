@@ -6,6 +6,7 @@ export type AuthTokenPayload = {
   phone?: string;
   email?: string;
   deviceId?: string;
+  firebaseUid?: string;
 };
 
 export type NearbyWorker = {

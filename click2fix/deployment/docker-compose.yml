@@ -46,6 +46,11 @@ services:
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production}
       AI_SERVICE_URL: ${AI_SERVICE_URL:-http://ai_service:8001}
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:3000,http://localhost:8081}
+      FIREBASE_PROJECT_ID: ${FIREBASE_PROJECT_ID:-}
+      FIREBASE_CLIENT_EMAIL: ${FIREBASE_CLIENT_EMAIL:-}
+      FIREBASE_PRIVATE_KEY: ${FIREBASE_PRIVATE_KEY:-}
+      FIREBASE_STORAGE_BUCKET: ${FIREBASE_STORAGE_BUCKET:-}
+      FIREBASE_DATABASE_URL: ${FIREBASE_DATABASE_URL:-}
     ports:
       - "8080:8080"
     depends_on:

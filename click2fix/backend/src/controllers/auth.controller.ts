@@ -14,6 +14,10 @@ export const verifyOtp = asyncHandler(async (req: Request, res: Response) => {
   res.json(await authService.verifyOtp(req.body));
 });
 
+export const firebaseLogin = asyncHandler(async (req: Request, res: Response) => {
+  res.json(await authService.firebaseLogin(req.body));
+});
+
 export const logout = asyncHandler(async (_req: Request, res: Response) => {
   res.json(await authService.logout());
 });

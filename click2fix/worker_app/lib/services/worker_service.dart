@@ -1,12 +1,15 @@
 import 'api_client.dart';
+import 'push_notification_service.dart';
 
 class WorkerService {
-  WorkerService(this._client);
+  WorkerService(this._client, this._pushNotificationService);
 
   final ApiClient _client;
+  final PushNotificationService _pushNotificationService;
 
   Future<void> setAvailability(bool availability) {
-    return _client.post('/worker/set-availability', {'availability': availability}).then((_) {});
+    return _client.post('/worker/set-availability',
+        {'availability': availability}).then((_) {});
   }
 
   Future<void> sendQuote({
@@ -22,5 +25,12 @@ class WorkerService {
       'message': message,
     }).then((_) {});
   }
-}
 
+  Future<void> registerPushToken(String authToken) {
+    return _pushNotificationService.registerDeviceToken(
+      apiClient: _client,
+      authToken: authToken,
+      appVariant: 'worker',
+    );
+  }
+}

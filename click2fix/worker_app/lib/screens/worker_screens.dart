@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 
 import '../config/app_theme.dart';
 import '../widgets/action_button.dart';
+import '../widgets/location_map_preview.dart';
 import '../widgets/worker_scaffold.dart';
 
 class WorkerLoginScreen extends StatelessWidget {
@@ -12,8 +13,11 @@ class WorkerLoginScreen extends StatelessWidget {
   Widget build(BuildContext context) => WorkerScaffold(
         title: 'Worker Login',
         children: [
-          const TextField(decoration: InputDecoration(labelText: 'Mobile number'), keyboardType: TextInputType.phone),
-          ActionButton(label: 'Send OTP', onPressed: () => context.go('/registration')),
+          const TextField(
+              decoration: InputDecoration(labelText: 'Mobile number'),
+              keyboardType: TextInputType.phone),
+          ActionButton(
+              label: 'Send OTP', onPressed: () => context.go('/registration')),
         ],
       );
 }
@@ -26,8 +30,11 @@ class WorkerRegistrationScreen extends StatelessWidget {
         title: 'Registration',
         children: [
           const TextField(decoration: InputDecoration(labelText: 'Full name')),
-          const TextField(decoration: InputDecoration(labelText: 'Experience in years'), keyboardType: TextInputType.number),
-          ActionButton(label: 'Continue', onPressed: () => context.go('/aadhaar')),
+          const TextField(
+              decoration: InputDecoration(labelText: 'Experience in years'),
+              keyboardType: TextInputType.number),
+          ActionButton(
+              label: 'Continue', onPressed: () => context.go('/aadhaar')),
         ],
       );
 }
@@ -67,15 +74,24 @@ class SkillSelectionScreen extends StatelessWidget {
             spacing: 8,
             runSpacing: 8,
             children: [
-              FilterChip(label: Text('Plumbing'), selected: true, onSelected: null),
-              FilterChip(label: Text('Electrical'), selected: false, onSelected: null),
-              FilterChip(label: Text('Carpentry'), selected: false, onSelected: null),
-              FilterChip(label: Text('Cleaning'), selected: false, onSelected: null),
-              FilterChip(label: Text('Painting'), selected: false, onSelected: null),
-              FilterChip(label: Text('Appliance Repair'), selected: false, onSelected: null),
+              FilterChip(
+                  label: Text('Plumbing'), selected: true, onSelected: null),
+              FilterChip(
+                  label: Text('Electrical'), selected: false, onSelected: null),
+              FilterChip(
+                  label: Text('Carpentry'), selected: false, onSelected: null),
+              FilterChip(
+                  label: Text('Cleaning'), selected: false, onSelected: null),
+              FilterChip(
+                  label: Text('Painting'), selected: false, onSelected: null),
+              FilterChip(
+                  label: Text('Appliance Repair'),
+                  selected: false,
+                  onSelected: null),
             ],
           ),
-          ActionButton(label: 'Set Service Area', onPressed: () => context.go('/area')),
+          ActionButton(
+              label: 'Set Service Area', onPressed: () => context.go('/area')),
         ],
       );
 }
@@ -84,11 +100,18 @@ class WorkingAreaSetupScreen extends StatelessWidget {
   const WorkingAreaSetupScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => _SimpleWorkerScreen(
+  Widget build(BuildContext context) => WorkerScaffold(
         title: 'Service Area',
-        body: 'Set radius and working zones.',
-        label: 'Set Hours',
-        route: '/hours',
+        children: [
+          const _InfoCard(
+              title: 'Service Radius', body: 'Set radius and working zones.'),
+          const LocationMapPreview(
+            title: 'Coverage preview',
+            note: 'Draw editable service polygons in the next iteration.',
+          ),
+          ActionButton(
+              label: 'Set Hours', onPressed: () => context.go('/hours')),
+        ],
       );
 }
 
@@ -111,11 +134,22 @@ class WorkerDashboardScreen extends StatelessWidget {
   Widget build(BuildContext context) => WorkerScaffold(
         title: 'Worker Dashboard',
         children: [
-          SwitchListTile(value: true, onChanged: (_) => context.go('/availability'), title: const Text('Available')),
-          _InfoCard(title: 'Today', body: '3 nearby requests. Wallet INR 2450. Rating 4.8.'),
-          ActionButton(label: 'Nearby Requests', onPressed: () => context.go('/requests')),
-          OutlinedButton(onPressed: () => context.go('/wallet'), child: const Text('Earnings and Wallet')),
-          OutlinedButton(onPressed: () => context.go('/profile'), child: const Text('Profile')),
+          SwitchListTile(
+              value: true,
+              onChanged: (_) => context.go('/availability'),
+              title: const Text('Available')),
+          _InfoCard(
+              title: 'Today',
+              body: '3 nearby requests. Wallet INR 2450. Rating 4.8.'),
+          ActionButton(
+              label: 'Nearby Requests',
+              onPressed: () => context.go('/requests')),
+          OutlinedButton(
+              onPressed: () => context.go('/wallet'),
+              child: const Text('Earnings and Wallet')),
+          OutlinedButton(
+              onPressed: () => context.go('/profile'),
+              child: const Text('Profile')),
         ],
       );
 }
@@ -127,8 +161,11 @@ class NearbyRequestsScreen extends StatelessWidget {
   Widget build(BuildContext context) => WorkerScaffold(
         title: 'Nearby Requests',
         children: [
-          _RequestCard(title: 'Pipe leakage', body: 'Plumbing. 2.1 km. High urgency.'),
-          _RequestCard(title: 'Fan not working', body: 'Electrical. 4.2 km. Medium urgency.'),
+          _RequestCard(
+              title: 'Pipe leakage', body: 'Plumbing. 2.1 km. High urgency.'),
+          _RequestCard(
+              title: 'Fan not working',
+              body: 'Electrical. 4.2 km. Medium urgency.'),
         ],
       );
 }
@@ -137,11 +174,22 @@ class RequestDetailScreen extends StatelessWidget {
   const RequestDetailScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => _SimpleWorkerScreen(
+  Widget build(BuildContext context) => WorkerScaffold(
         title: 'Request Detail',
-        body: 'Issue image, category, distance, suggested price, and user location.',
-        label: 'Send Quote',
-        route: '/quote',
+        children: [
+          const _InfoCard(
+            title: 'Issue Summary',
+            body:
+                'Issue image, category, distance, suggested price, and user location.',
+          ),
+          const LocationMapPreview(
+            title: 'Customer location',
+            latitude: 12.9804,
+            longitude: 77.6046,
+          ),
+          ActionButton(
+              label: 'Send Quote', onPressed: () => context.go('/quote')),
+        ],
       );
 }
 
@@ -152,10 +200,16 @@ class QuoteSubmissionScreen extends StatelessWidget {
   Widget build(BuildContext context) => WorkerScaffold(
         title: 'Quote',
         children: [
-          const TextField(decoration: InputDecoration(labelText: 'Price'), keyboardType: TextInputType.number),
-          const TextField(decoration: InputDecoration(labelText: 'Arrival time in minutes'), keyboardType: TextInputType.number),
-          const TextField(decoration: InputDecoration(labelText: 'Message'), maxLines: 3),
-          ActionButton(label: 'Send Quote', onPressed: () => context.go('/navigation')),
+          const TextField(
+              decoration: InputDecoration(labelText: 'Price'),
+              keyboardType: TextInputType.number),
+          const TextField(
+              decoration: InputDecoration(labelText: 'Arrival time in minutes'),
+              keyboardType: TextInputType.number),
+          const TextField(
+              decoration: InputDecoration(labelText: 'Message'), maxLines: 3),
+          ActionButton(
+              label: 'Send Quote', onPressed: () => context.go('/navigation')),
         ],
       );
 }
@@ -164,11 +218,21 @@ class NavigationScreen extends StatelessWidget {
   const NavigationScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => _SimpleWorkerScreen(
+  Widget build(BuildContext context) => WorkerScaffold(
         title: 'Navigation',
-        body: 'Route to customer with ETA and call shortcut.',
-        label: 'Start Booking',
-        route: '/active-booking',
+        children: [
+          const _InfoCard(
+              title: 'Route',
+              body: 'Route to customer with ETA and call shortcut.'),
+          const LocationMapPreview(
+            title: 'Turn-by-turn map',
+            latitude: 12.9756,
+            longitude: 77.6112,
+          ),
+          ActionButton(
+              label: 'Start Booking',
+              onPressed: () => context.go('/active-booking')),
+        ],
       );
 }
 
@@ -179,8 +243,13 @@ class ActiveBookingScreen extends StatelessWidget {
   Widget build(BuildContext context) => WorkerScaffold(
         title: 'Active Booking',
         children: [
-          _InfoCard(title: 'Status', body: 'Accepted, on the way, arrived, work started, completed.'),
-          ActionButton(label: 'Mark Completed', onPressed: () => context.go('/wallet'), color: AppColors.successGreen),
+          _InfoCard(
+              title: 'Status',
+              body: 'Accepted, on the way, arrived, work started, completed.'),
+          ActionButton(
+              label: 'Mark Completed',
+              onPressed: () => context.go('/wallet'),
+              color: AppColors.successGreen),
         ],
       );
 }
@@ -189,32 +258,40 @@ class EarningsWalletScreen extends StatelessWidget {
   const EarningsWalletScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const _SimpleWorkerScreen(title: 'Earnings', body: 'Wallet balance INR 2450. Payouts and booking earnings.');
+  Widget build(BuildContext context) => const _SimpleWorkerScreen(
+      title: 'Earnings',
+      body: 'Wallet balance INR 2450. Payouts and booking earnings.');
 }
 
 class ReviewsScreen extends StatelessWidget {
   const ReviewsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const _SimpleWorkerScreen(title: 'Reviews', body: 'Average rating 4.8. Trust score 92.');
+  Widget build(BuildContext context) => const _SimpleWorkerScreen(
+      title: 'Reviews', body: 'Average rating 4.8. Trust score 92.');
 }
 
 class AvailabilityToggleScreen extends StatelessWidget {
   const AvailabilityToggleScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const _SimpleWorkerScreen(title: 'Availability', body: 'Switch availability on or off and set next available time.');
+  Widget build(BuildContext context) => const _SimpleWorkerScreen(
+      title: 'Availability',
+      body: 'Switch availability on or off and set next available time.');
 }
 
 class WorkerProfileScreen extends StatelessWidget {
   const WorkerProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context) => const _SimpleWorkerScreen(title: 'Worker Profile', body: 'Identity, badges, skills, service area, documents, and support.');
+  Widget build(BuildContext context) => const _SimpleWorkerScreen(
+      title: 'Worker Profile',
+      body: 'Identity, badges, skills, service area, documents, and support.');
 }
 
 class _SimpleWorkerScreen extends StatelessWidget {
-  const _SimpleWorkerScreen({required this.title, required this.body, this.label, this.route});
+  const _SimpleWorkerScreen(
+      {required this.title, required this.body, this.label, this.route});
 
   final String title;
   final String body;
@@ -226,7 +303,8 @@ class _SimpleWorkerScreen extends StatelessWidget {
         title: title,
         children: [
           _InfoCard(title: title, body: body),
-          if (label != null && route != null) ActionButton(label: label!, onPressed: () => context.go(route!)),
+          if (label != null && route != null)
+            ActionButton(label: label!, onPressed: () => context.go(route!)),
         ],
       );
 }
@@ -269,4 +347,3 @@ class _RequestCard extends StatelessWidget {
         ),
       );
 }
-
