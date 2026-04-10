@@ -2,6 +2,7 @@ services:
   - type: web
     name: click2fix-backend
     runtime: node
+    runtimeVersion: 20.11.1
     plan: free
     buildCommand: bash build.sh
     startCommand: cd backend && node dist/server.js
