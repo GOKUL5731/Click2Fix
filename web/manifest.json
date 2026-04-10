@@ -1,6 +1,6 @@
 {
-    "name": "click2fix",
-    "short_name": "click2fix",
+    "name": "click2fix_mobile_app",
+    "short_name": "click2fix_mobile_app",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
