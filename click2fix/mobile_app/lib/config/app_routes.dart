@@ -1,40 +1,70 @@
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../screens/user_screens.dart';
+import '../screens/splash_screen.dart';
+import '../screens/onboarding_screen.dart';
+import '../screens/login_screen.dart';
+import '../screens/otp_screen.dart';
+import '../screens/home_dashboard_screen.dart';
+import '../screens/upload_issue_screen.dart';
+import '../screens/ai_result_screen.dart';
+import '../screens/worker_comparison_screen.dart';
+import '../screens/worker_detail_screen.dart';
+import '../screens/booking_confirmation_screen.dart';
+import '../screens/live_tracking_screen.dart';
+import '../screens/chat_screen.dart';
+import '../screens/payment_screen.dart';
+import '../screens/review_screen.dart';
+import '../screens/booking_history_screen.dart';
+import '../screens/profile_screen.dart';
+import '../screens/settings_screen.dart';
+import '../screens/emergency_screen.dart';
+import '../screens/notifications_screen.dart';
+import '../screens/worker/worker_dashboard_screen.dart';
+import '../screens/worker/quote_submission_screen.dart';
+import '../screens/worker/earnings_screen.dart';
+import '../screens/worker/worker_profile_screen.dart';
 
-final userRouter = GoRouter(
+final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
-    GoRoute(path: '/', builder: (_, __) => const SplashScreen()),
-    GoRoute(path: '/onboarding', builder: (_, __) => const OnboardingScreen()),
-    GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-    GoRoute(path: '/otp', builder: (_, __) => const OtpVerificationScreen()),
-    GoRoute(path: '/face', builder: (_, __) => const FaceVerificationScreen()),
-    GoRoute(path: '/home', builder: (_, __) => const HomeDashboardScreen()),
-    GoRoute(path: '/upload', builder: (_, __) => const UploadIssueScreen()),
+    // ─── Auth Flow ───────────────────────────────
+    GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
+    GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
+    GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
     GoRoute(
-        path: '/ai-result',
-        builder: (_, __) => const AiDetectionResultScreen()),
-    GoRoute(
-        path: '/workers', builder: (_, __) => const WorkerComparisonScreen()),
-    GoRoute(
-        path: '/worker-detail', builder: (_, __) => const WorkerDetailScreen()),
-    GoRoute(
-        path: '/booking-confirmation',
-        builder: (_, __) => const BookingConfirmationScreen()),
-    GoRoute(path: '/tracking', builder: (_, __) => const LiveTrackingScreen()),
-    GoRoute(path: '/chat', builder: (_, __) => const ChatScreen()),
-    GoRoute(path: '/voice-call', builder: (_, __) => const VoiceCallScreen()),
-    GoRoute(path: '/payment', builder: (_, __) => const PaymentScreen()),
-    GoRoute(path: '/review', builder: (_, __) => const ReviewRatingScreen()),
-    GoRoute(path: '/history', builder: (_, __) => const BookingHistoryScreen()),
-    GoRoute(path: '/invoice', builder: (_, __) => const InvoiceScreen()),
-    GoRoute(
-        path: '/notifications',
-        builder: (_, __) => const NotificationCenterScreen()),
-    GoRoute(path: '/profile', builder: (_, __) => const ProfileScreen()),
-    GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
-    GoRoute(
-        path: '/emergency', builder: (_, __) => const EmergencyRequestScreen()),
+      path: '/otp',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return OtpScreen(
+          phone: extra?['phone'] as String?,
+          isWorker: extra?['isWorker'] as bool? ?? false,
+        );
+      },
+    ),
+
+    // ─── User Flow ───────────────────────────────
+    GoRoute(path: '/home', builder: (context, state) => const HomeDashboardScreen()),
+    GoRoute(path: '/upload', builder: (context, state) => const UploadIssueScreen()),
+    GoRoute(path: '/ai-result', builder: (context, state) => const AiResultScreen()),
+    GoRoute(path: '/workers', builder: (context, state) => const WorkerComparisonScreen()),
+    GoRoute(path: '/worker-detail', builder: (context, state) => const WorkerDetailScreen()),
+    GoRoute(path: '/booking-confirmation', builder: (context, state) => const BookingConfirmationScreen()),
+    GoRoute(path: '/tracking', builder: (context, state) => const LiveTrackingScreen()),
+    GoRoute(path: '/chat', builder: (context, state) => const ChatScreen()),
+    GoRoute(path: '/payment', builder: (context, state) => const PaymentScreen()),
+    GoRoute(path: '/review', builder: (context, state) => const ReviewScreen()),
+    GoRoute(path: '/history', builder: (context, state) => const BookingHistoryScreen()),
+    GoRoute(path: '/profile', builder: (context, state) => const ProfileScreen()),
+    GoRoute(path: '/settings', builder: (context, state) => const SettingsScreen()),
+    GoRoute(path: '/emergency', builder: (context, state) => const EmergencyScreen()),
+    GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
+
+    // ─── Worker Flow ─────────────────────────────
+    GoRoute(path: '/worker/dashboard', builder: (context, state) => const WorkerDashboardScreen()),
+    GoRoute(path: '/worker/requests', builder: (context, state) => const WorkerDashboardScreen()), // Same as dashboard with requests tab
+    GoRoute(path: '/worker/quote', builder: (context, state) => const QuoteSubmissionScreen()),
+    GoRoute(path: '/worker/earnings', builder: (context, state) => const EarningsScreen()),
+    GoRoute(path: '/worker/profile', builder: (context, state) => const WorkerProfileScreen()),
   ],
 );

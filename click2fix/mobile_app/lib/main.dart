@@ -1,27 +1,25 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
 import 'config/app_routes.dart';
 import 'config/app_theme.dart';
-import 'services/push_notification_service.dart';
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  await PushNotificationService().initialize();
-  runApp(const ProviderScope(child: Click2FixUserApp()));
+  runApp(const ProviderScope(child: Click2FixApp()));
 }
 
-class Click2FixUserApp extends ConsumerWidget {
-  const Click2FixUserApp({super.key});
+class Click2FixApp extends StatelessWidget {
+  const Click2FixApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  Widget build(BuildContext context) {
     return MaterialApp.router(
       title: 'Click2Fix',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      routerConfig: userRouter,
+      themeMode: ThemeMode.light,
+      routerConfig: appRouter,
     );
   }
 }

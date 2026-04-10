@@ -1,15 +1,31 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../services/api_client.dart';
-import '../services/auth_service.dart';
-import '../services/push_notification_service.dart';
+enum UserRole { user, worker, none }
 
-final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
-final pushNotificationServiceProvider =
-    Provider<PushNotificationService>((ref) => PushNotificationService());
-final authServiceProvider = Provider<AuthService>(
-  (ref) => AuthService(
-      ref.watch(apiClientProvider), ref.watch(pushNotificationServiceProvider)),
-);
+class Session {
+  const Session({this.token, this.role = UserRole.none, this.phone, this.name});
+  final String? token;
+  final UserRole role;
+  final String? phone;
+  final String? name;
+  bool get isLoggedIn => token != null && role != UserRole.none;
+  bool get isUser => role == UserRole.user;
+  bool get isWorker => role == UserRole.worker;
+}
 
-final sessionTokenProvider = StateProvider<String?>((ref) => null);
+class SessionNotifier extends StateNotifier<Session> {
+  SessionNotifier() : super(const Session());
+
+  void login({required String token, required UserRole role, String? phone, String? name}) {
+    state = Session(token: token, role: role, phone: phone, name: name);
+  }
+
+  void logout() {
+    state = const Session();
+  }
+}
+
+final sessionProvider = StateNotifierProvider<SessionNotifier, Session>((ref) {
+  return SessionNotifier();
+});
