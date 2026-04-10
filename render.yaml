@@ -5,10 +5,24 @@ services:
     plan: free
     buildCommand: bash build.sh
     startCommand: cd backend && node dist/server.js
+    healthCheckPath: /health
+    healthCheckTimeout: 30
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 8080
+      - key: JWT_SECRET
+        fromSecret: JWT_SECRET
+      - key: DATABASE_URL
+        fromSecret: DATABASE_URL
+      - key: DIRECT_URL
+        fromSecret: DIRECT_URL
+      - key: REDIS_URL
+        fromSecret: REDIS_URL
+      - key: AI_SERVICE_URL
+        value: https://click2fix-ai-service.render.com
+      - key: CORS_ORIGINS
+        value: https://click2fix-admin.render.com,https://yourdomain.com
     autoDeploy: true
     region: oregon

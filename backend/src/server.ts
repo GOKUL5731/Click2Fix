@@ -8,11 +8,19 @@ const server = http.createServer(app);
 
 configureSockets(server);
 
-server.listen(config.port, () => {
-  console.log(`Click2Fix backend listening on port ${config.port}`);
+// Set keep-alive timeouts to prevent connection issues on Render
+server.keepAliveTimeout = 120000; // 120 seconds
+server.headersTimeout = 125000; // 125 seconds (must be > keepAliveTimeout)
+
+server.listen(config.port, '0.0.0.0', () => {
+  console.log(`Click2Fix backend listening on 0.0.0.0:${config.port}`);
 });
 
 process.on('SIGTERM', () => {
-  server.close(() => process.exit(0));
+  console.log('SIGTERM received, closing server gracefully');
+  server.close(() => {
+    console.log('Server closed');
+    process.exit(0);
+  });
 });
 
