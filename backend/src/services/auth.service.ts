@@ -6,7 +6,7 @@ import { query, redis } from '../database/client';
 import type { ActorRole, AuthTokenPayload } from '../models/types';
 import { httpError } from '../middleware/error';
 import { verifyFirebaseIdToken } from './firebase-auth.service';
-import { sendOtpSms } from './sms.service';
+import { sendOtpSms, sendTwilioVerifyOtp, checkTwilioVerifyOtp } from './sms.service';
 
 const otpMemoryStore = new Map<string, { otp: string; expiresAt: number; attempts: number }>();
 
@@ -173,10 +173,13 @@ export async function register(input: RegisterInput) {
     );
   }
 
+  if (config.twilioEnabled && config.twilioVerifyServiceSid) {
+    await sendTwilioVerifyOtp(input.phone);
+    return { message: 'OTP sent' };
+  }
+
   const otp = createOtp();
   await storeOtp(input.role, input.phone, otp);
-
-  // Send OTP via SMS
   await sendOtpSms(input.phone, otp);
 
   return {
@@ -215,6 +218,11 @@ export async function login(input: LoginInput) {
     throw httpError(404, `${input.role} not found. Register first.`);
   }
 
+  if (config.twilioEnabled && config.twilioVerifyServiceSid) {
+    await sendTwilioVerifyOtp(input.phone);
+    return { message: 'OTP sent' };
+  }
+
   const otp = createOtp();
   await storeOtp(input.role, input.phone, otp);
   await sendOtpSms(input.phone, otp);
@@ -226,10 +234,15 @@ export async function login(input: LoginInput) {
 }
 
 export async function verifyOtp(input: VerifyOtpInput) {
-  const expectedOtp = await readOtp(input.role, input.phone);
-  if (!expectedOtp || expectedOtp !== input.otp) {
-    await incrementOtpAttempts(input.role, input.phone);
-    throw httpError(401, 'Invalid or expired OTP');
+  if (config.twilioEnabled && config.twilioVerifyServiceSid) {
+    const result = await checkTwilioVerifyOtp(input.phone, input.otp);
+    if (!result.valid) throw httpError(401, 'Invalid or expired OTP');
+  } else {
+    const expectedOtp = await readOtp(input.role, input.phone);
+    if (!expectedOtp || expectedOtp !== input.otp) {
+      await incrementOtpAttempts(input.role, input.phone);
+      throw httpError(401, 'Invalid or expired OTP');
+    }
   }
 
   const table = input.role === 'worker' ? 'workers' : 'users';
@@ -257,6 +270,11 @@ export async function verifyOtp(input: VerifyOtpInput) {
 // ── Upload OTP (for image upload verification) ──────────────────────
 
 export async function requestUploadOtp(phone: string) {
+  if (config.twilioEnabled && config.twilioVerifyServiceSid) {
+    await sendTwilioVerifyOtp(phone);
+    return { message: 'Upload verification OTP sent' };
+  }
+
   const otp = createOtp();
   await storeOtp('upload', phone, otp);
   await sendOtpSms(phone, otp);
@@ -268,10 +286,15 @@ export async function requestUploadOtp(phone: string) {
 }
 
 export async function verifyUploadOtp(phone: string, otp: string) {
-  const expectedOtp = await readOtp('upload', phone);
-  if (!expectedOtp || expectedOtp !== otp) {
-    await incrementOtpAttempts('upload', phone);
-    throw httpError(401, 'Invalid or expired upload OTP');
+  if (config.twilioEnabled && config.twilioVerifyServiceSid) {
+    const result = await checkTwilioVerifyOtp(phone, otp);
+    if (!result.valid) throw httpError(401, 'Invalid or expired upload OTP');
+  } else {
+    const expectedOtp = await readOtp('upload', phone);
+    if (!expectedOtp || expectedOtp !== otp) {
+      await incrementOtpAttempts('upload', phone);
+      throw httpError(401, 'Invalid or expired upload OTP');
+    }
   }
 
   await clearOtp('upload', phone);
