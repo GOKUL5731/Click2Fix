@@ -170,7 +170,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             // Worker-specific fields
             if (_isWorker) ...[
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Service Category',
                   prefixIcon: Icon(Icons.build_circle_outlined),

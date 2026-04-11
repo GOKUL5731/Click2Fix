@@ -45,7 +45,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
   String? _aiCategory;
   double? _aiConfidence;
   String? _otpToken;
-  bool _showOtpDialog = false;
+  final bool _showOtpDialog = false;
   final _otpController = TextEditingController();
 
   // Animation
@@ -670,7 +670,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
           ),
           value: _isEmergency,
           onChanged: (val) => setState(() => _isEmergency = val),
-          activeColor: AppColors.emergencyRed,
+          activeThumbColor: AppColors.emergencyRed,
         ),
       ),
     );

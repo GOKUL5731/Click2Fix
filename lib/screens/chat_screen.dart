@@ -22,7 +22,7 @@ class _ChatScreenState extends State<ChatScreen> {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
     setState(() {
-      _messages.add((text: text, isMe: true, time: '${TimeOfDay.now().format(context)}'));
+      _messages.add((text: text, isMe: true, time: TimeOfDay.now().format(context)));
       _msgController.clear();
     });
     // Auto reply

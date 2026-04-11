@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
-import '../../widgets/gradient_header.dart';
 
 class EarningsScreen extends StatelessWidget {
   const EarningsScreen({super.key});

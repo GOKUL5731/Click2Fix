@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
-import '../widgets/primary_action_button.dart';
 
 class EmergencyScreen extends StatelessWidget {
   const EmergencyScreen({super.key});

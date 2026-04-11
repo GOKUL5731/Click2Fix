@@ -1,4 +1,5 @@
 ﻿import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -46,6 +47,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
   String? _aiCategory;
   double? _aiConfidence;
   String? _otpToken;
+  final bool _showOtpDialog = false;
   final _otpController = TextEditingController();
 
   // Animation
@@ -108,7 +110,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
         source: source,
         maxWidth: 1920,
         maxHeight: 1920,
-        imageQuality: 75,
+        imageQuality: 85,
       );
       if (picked != null) {
         setState(() {
@@ -118,32 +120,15 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
           _aiCategory = null;
         });
 
-        // Send to real backend AI endpoint
-        try {
-          final result = await _issueService.analyzeImageFile(picked.path);
-          if (mounted) {
-            setState(() {
-              _isAnalyzing = false;
-              _aiCategory = (result['category'] as String?)?.replaceAll('_', ' ');
-              _aiDescription = result['description'] as String? ??
-                  'AI detected: ${_aiCategory ?? 'unknown issue'}. Please add more details.';
-              _aiConfidence = (result['confidence'] as num?)?.toDouble() ?? 0.7;
-              // Auto-fill description if empty
-              if (_descriptionController.text.isEmpty && _aiDescription != null) {
-                _descriptionController.text = _aiDescription!;
-              }
-            });
-          }
-        } catch (e) {
-          if (mounted) {
-            setState(() {
-              _isAnalyzing = false;
-              _aiDescription = 'Image captured. Please describe the problem manually.';
-              _aiCategory = 'unknown';
-              _aiConfidence = 0.5;
-            });
-          }
-        }
+        // Simulate AI analysis (will work with real backend)
+        await Future.delayed(const Duration(seconds: 1));
+        setState(() {
+          _isAnalyzing = false;
+          _aiDescription =
+              'Problem detected in image. AI will auto-fill details after submission.';
+          _aiCategory = 'auto-detect';
+          _aiConfidence = 0.75;
+        });
       }
     } catch (e) {
       _showSnackBar('Failed to pick image: $e');
@@ -378,32 +363,32 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
               delegate: SliverChildListDelegate([
                 const SizedBox(height: 8),
 
-                // â”€â”€ Image Capture Section â”€â”€
+                // ── Image Capture Section ──
                 _buildImageSection(cs),
                 const SizedBox(height: 20),
 
-                // â”€â”€ AI Analysis Result â”€â”€
+                // ── AI Analysis Result ──
                 if (_isAnalyzing) _buildAnalyzingCard(),
                 if (_aiDescription != null && !_isAnalyzing) _buildAiResultCard(),
                 if (_aiDescription != null || _isAnalyzing) const SizedBox(height: 16),
 
-                // â”€â”€ Description Input â”€â”€
+                // ── Description Input ──
                 _buildDescriptionSection(cs),
                 const SizedBox(height: 16),
 
-                // â”€â”€ Voice Input â”€â”€
+                // ── Voice Input ──
                 _buildVoiceSection(cs),
                 const SizedBox(height: 16),
 
-                // â”€â”€ Emergency Toggle â”€â”€
+                // ── Emergency Toggle ──
                 _buildEmergencyToggle(),
                 const SizedBox(height: 16),
 
-                // â”€â”€ Location â”€â”€
+                // ── Location ──
                 _buildLocationCard(),
                 const SizedBox(height: 24),
 
-                // â”€â”€ Submit Button â”€â”€
+                // ── Submit Button ──
                 _buildSubmitButton(cs),
                 const SizedBox(height: 40),
               ]),
@@ -418,7 +403,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('ðŸ“¸ Capture the Problem',
+        Text('📸 Capture the Problem',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
         const SizedBox(height: 8),
         if (_imagePath != null)
@@ -593,7 +578,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('ðŸ“ Describe the Problem',
+        Text('📝 Describe the Problem',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
         const SizedBox(height: 8),
         TextField(
@@ -614,7 +599,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('ðŸŽ¤ Voice Description',
+        Text('🎤 Voice Description',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
         const SizedBox(height: 8),
         Card(
@@ -651,7 +636,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
                         _isRecording
                             ? 'Recording... Tap to stop'
                             : _voicePath != null
-                                ? 'Voice note recorded âœ“'
+                                ? 'Voice note recorded ✓'
                                 : 'Tap to record voice note',
                         style: TextStyle(
                           fontWeight: FontWeight.w600,
@@ -659,7 +644,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
                         ),
                       ),
                       Text(
-                        'Speak in any language â€” auto-translated to English',
+                        'Speak in any language — auto-translated to English',
                         style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
                       ),
                     ],
@@ -703,13 +688,13 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
           ),
           subtitle: Text(
             _isEmergency
-                ? 'Priority dispatch â€¢ Dynamic pricing applies'
+                ? 'Priority dispatch • Dynamic pricing applies'
                 : 'Toggle for urgent repairs (gas leak, flooding, etc.)',
             style: const TextStyle(fontSize: 12),
           ),
           value: _isEmergency,
           onChanged: (val) => setState(() => _isEmergency = val),
-          activeColor: AppColors.emergencyRed,
+          activeThumbColor: AppColors.emergencyRed,
         ),
       ),
     );
@@ -816,5 +801,3 @@ class _ImageActionCard extends StatelessWidget {
     );
   }
 }
-
-

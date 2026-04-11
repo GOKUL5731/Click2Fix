@@ -77,7 +77,7 @@ class _ToggleTile extends StatelessWidget {
       child: Row(children: [
         Icon(icon, size: 20, color: AppColors.primaryBlue), const SizedBox(width: 14),
         Expanded(child: Text(label, style: Theme.of(context).textTheme.titleSmall)),
-        Switch(value: value, onChanged: onChanged, activeColor: AppColors.primaryBlue),
+        Switch(value: value, onChanged: onChanged, activeThumbColor: AppColors.primaryBlue),
       ]),
     );
   }
