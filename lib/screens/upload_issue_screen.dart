@@ -1,5 +1,4 @@
-﻿import 'dart:io';
-import 'dart:typed_data';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,7 +10,6 @@ import 'package:path_provider/path_provider.dart';
 
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
-import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/issue_service.dart';
 
@@ -24,10 +22,7 @@ class UploadIssueScreen extends ConsumerStatefulWidget {
 
 class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
     with TickerProviderStateMixin {
-  // Services
-  final _apiClient = ApiClient();
-  late final _authService = AuthService(_apiClient);
-  late final _issueService = IssueService(_apiClient);
+  // Services — use shared provider; token injected before each call
   final _imagePicker = ImagePicker();
   final _audioRecorder = AudioRecorder();
 
@@ -69,10 +64,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
   }
 
   void _initToken() {
-    final session = ref.read(sessionProvider);
-    if (session.token != null) {
-      _apiClient.setToken(session.token);
-    }
+    // Token is managed by the shared apiClientProvider — no manual init needed
   }
 
   @override
@@ -120,15 +112,35 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
           _aiCategory = null;
         });
 
-        // Simulate AI analysis (will work with real backend)
-        await Future.delayed(const Duration(seconds: 1));
-        setState(() {
-          _isAnalyzing = false;
-          _aiDescription =
-              'Problem detected in image. AI will auto-fill details after submission.';
-          _aiCategory = 'auto-detect';
-          _aiConfidence = 0.75;
-        });
+        // Send to real backend AI endpoint using shared ApiClient (has JWT token)
+        try {
+          final session = ref.read(sessionProvider);
+          final client = ref.read(apiClientProvider);
+          client.setToken(session.token);
+          final issueService = IssueService(client);
+          final result = await issueService.analyzeImageFile(picked.path);
+          if (mounted) {
+            setState(() {
+              _isAnalyzing = false;
+              _aiCategory = (result['category'] as String?)?.replaceAll('_', ' ');
+              _aiDescription = result['description'] as String? ??
+                  'AI detected: ${_aiCategory ?? 'unknown issue'}. Please add more details.';
+              _aiConfidence = (result['confidence'] as num?)?.toDouble() ?? 0.7;
+              if (_descriptionController.text.isEmpty && _aiDescription != null) {
+                _descriptionController.text = _aiDescription!;
+              }
+            });
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() {
+              _isAnalyzing = false;
+              _aiDescription = 'Image captured. Please describe the problem.';
+              _aiCategory = 'unknown';
+              _aiConfidence = 0.5;
+            });
+          }
+        }
       }
     } catch (e) {
       _showSnackBar('Failed to pick image: $e');
@@ -235,7 +247,10 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
                   final otp = _otpController.text.trim();
                   if (otp.length != 6) return;
                   try {
-                    final token = await _authService.verifyUploadOtp(
+                    final client = ref.read(apiClientProvider);
+                    client.setToken(session.token);
+                    final authService = AuthService(client);
+                    final token = await authService.verifyUploadOtp(
                       session.phone ?? '',
                       otp,
                     );
@@ -268,10 +283,13 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
 
     final session = ref.read(sessionProvider);
 
-    // Request upload OTP
+    // Request upload OTP via shared client
     setState(() => _isSubmitting = true);
     try {
-      await _authService.requestUploadOtp(session.phone ?? '');
+      final client = ref.read(apiClientProvider);
+      client.setToken(session.token);
+      final authService = AuthService(client);
+      await authService.requestUploadOtp(session.phone ?? '');
       setState(() => _isSubmitting = false);
       _showOtpVerification();
     } catch (e) {
@@ -284,7 +302,13 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
   Future<void> _submitIssue() async {
     setState(() => _isSubmitting = true);
     try {
-      final result = await _issueService.createIssue(
+      // Inject JWT token into shared client before submission
+      final session = ref.read(sessionProvider);
+      final client = ref.read(apiClientProvider);
+      client.setToken(session.token);
+      final issueService = IssueService(client);
+
+      await issueService.createIssue(
         description: _descriptionController.text.isNotEmpty
             ? _descriptionController.text
             : _aiDescription,

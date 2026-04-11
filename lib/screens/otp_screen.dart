@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
-import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../widgets/primary_action_button.dart';
 
@@ -20,8 +19,6 @@ class OtpScreen extends ConsumerStatefulWidget {
 class _OtpScreenState extends ConsumerState<OtpScreen> {
   final List<TextEditingController> _controllers = List.generate(6, (_) => TextEditingController());
   final List<FocusNode> _focusNodes = List.generate(6, (_) => FocusNode());
-  final _apiClient = ApiClient();
-  late final _authService = AuthService(_apiClient);
   bool _isLoading = false;
   int _resendSeconds = 30;
   bool _canResend = false;
@@ -61,19 +58,17 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     final role = widget.isWorker ? 'worker' : 'user';
 
     try {
-      // Try real API verification
-      final token = await _authService.verifyOtp(
+      // Use the shared ApiClient from provider so the token propagates everywhere
+      final client = ref.read(apiClientProvider);
+      final authService = AuthService(client);
+      final token = await authService.verifyOtp(
         widget.phone ?? '',
         _otp,
         role: role,
       );
 
       final sessionRole = widget.isWorker ? UserRole.worker : UserRole.user;
-      await _authService.saveSession(
-        token: token,
-        role: role,
-        phone: widget.phone,
-      );
+      // sessionProvider.login() persists the session internally
       ref.read(sessionProvider.notifier).login(
             token: token,
             role: sessionRole,

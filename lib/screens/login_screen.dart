@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
-import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../widgets/primary_action_button.dart';
 
@@ -16,8 +15,6 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
-  final _apiClient = ApiClient();
-  late final _authService = AuthService(_apiClient);
   bool _isWorker = false;
   bool _isLoading = false;
 
@@ -38,7 +35,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     setState(() => _isLoading = true);
     try {
       final role = _isWorker ? 'worker' : 'user';
-      await _authService.loginWithPhone(phone, role: role);
+      final client = ref.read(apiClientProvider);
+      final authService = AuthService(client);
+      await authService.loginWithPhone(phone, role: role);
       if (mounted) {
         setState(() => _isLoading = false);
         context.go('/otp', extra: {'phone': phone, 'isWorker': _isWorker});

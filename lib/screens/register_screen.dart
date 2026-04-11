@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
-import '../services/api_client.dart';
+import '../providers/session_provider.dart';
 import '../services/auth_service.dart';
 import '../widgets/primary_action_button.dart';
 
@@ -17,8 +17,6 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _nameController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
-  final _apiClient = ApiClient();
-  late final _authService = AuthService(_apiClient);
 
   bool _isWorker = false;
   bool _isLoading = false;
@@ -62,7 +60,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
     setState(() => _isLoading = true);
     try {
-      await _authService.register(
+      final client = ref.read(apiClientProvider);
+      final authService = AuthService(client);
+      await authService.register(
         role: _isWorker ? 'worker' : 'user',
         phone: phone,
         name: name,
