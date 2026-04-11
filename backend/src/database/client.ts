@@ -3,14 +3,16 @@ import Redis from 'ioredis';
 import { config } from '../config';
 
 export const pool = new Pool({
-  connectionString: config.databaseUrl,
+  connectionString: config.databaseUrl.replace('sslmode=require', ''),
+  ssl: config.nodeEnv === 'production' ? { rejectUnauthorized: false } : { rejectUnauthorized: false },
   max: 20,
   idleTimeoutMillis: 30000
 });
 
 export const redis = new Redis(config.redisUrl, {
   lazyConnect: true,
-  maxRetriesPerRequest: 2
+  maxRetriesPerRequest: 2,
+  enableOfflineQueue: false
 });
 
 redis.on('error', (error) => {
