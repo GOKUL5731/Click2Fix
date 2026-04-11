@@ -10,7 +10,6 @@ class ProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final session = ref.watch(sessionProvider);
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: SingleChildScrollView(child: Column(children: [
         GradientHeader(

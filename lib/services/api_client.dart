@@ -1,24 +1,26 @@
 import 'package:dio/dio.dart';
-
 import '../config/app_config.dart';
 
 class ApiClient {
-  ApiClient({Dio? dio})
-      : _dio = dio ??
+  ApiClient({Dio? dio, String? baseUrl})
+      : _baseUrl = baseUrl ?? AppConfig.apiBaseUrl,
+        _dio = dio ??
             Dio(
               BaseOptions(
-                baseUrl: AppConfig.apiBaseUrl,
-                connectTimeout: const Duration(seconds: 15),
-                receiveTimeout: const Duration(seconds: 30),
-                sendTimeout: const Duration(seconds: 30),
+                baseUrl: baseUrl ?? AppConfig.apiBaseUrl,
+                connectTimeout: const Duration(seconds: 30),
+                receiveTimeout: const Duration(seconds: 60),
+                sendTimeout: const Duration(seconds: 60),
               ),
             ) {
     _dio.interceptors.add(InterceptorsWrapper(
       onError: (error, handler) async {
-        // Retry logic for network errors
+        // Retry once on connection errors (handles Render cold-start delay)
         if (_shouldRetry(error) && error.requestOptions.extra['retryCount'] == null) {
           error.requestOptions.extra['retryCount'] = 1;
           try {
+            // Wait 3s for Render to wake up before retrying
+            await Future.delayed(const Duration(seconds: 3));
             final response = await _dio.fetch(error.requestOptions);
             return handler.resolve(response);
           } catch (e) {
@@ -31,12 +33,14 @@ class ApiClient {
   }
 
   final Dio _dio;
+  final String _baseUrl;
   String? _token;
 
   bool _shouldRetry(DioException error) {
     return error.type == DioExceptionType.connectionTimeout ||
         error.type == DioExceptionType.receiveTimeout ||
-        error.type == DioExceptionType.connectionError;
+        error.type == DioExceptionType.connectionError ||
+        error.type == DioExceptionType.unknown;
   }
 
   void setToken(String? token) {
@@ -49,6 +53,7 @@ class ApiClient {
   }
 
   String? get token => _token;
+  String get baseUrl => _baseUrl;
 
   Future<Response<dynamic>> post(String path, dynamic data) {
     return _dio.post(path, data: data);
@@ -60,6 +65,10 @@ class ApiClient {
 
   Future<Response<dynamic>> put(String path, dynamic data) {
     return _dio.put(path, data: data);
+  }
+
+  Future<Response<dynamic>> patch(String path, dynamic data) {
+    return _dio.patch(path, data: data);
   }
 
   Future<Response<dynamic>> delete(String path) {

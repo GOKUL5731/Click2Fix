@@ -1,5 +1,4 @@
-import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+﻿import 'package:go_router/go_router.dart';
 
 import '../screens/splash_screen.dart';
 import '../screens/onboarding_screen.dart';
@@ -29,7 +28,7 @@ import '../screens/worker/worker_profile_screen.dart';
 final appRouter = GoRouter(
   initialLocation: '/',
   routes: [
-    // ─── Auth Flow ───────────────────────────────
+    // â”€â”€â”€ Auth Flow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
     GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
@@ -45,7 +44,7 @@ final appRouter = GoRouter(
       },
     ),
 
-    // ─── User Flow ───────────────────────────────
+    // â”€â”€â”€ User Flow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     GoRoute(path: '/home', builder: (context, state) => const HomeDashboardScreen()),
     GoRoute(path: '/upload', builder: (context, state) => const UploadIssueScreen()),
     GoRoute(path: '/ai-result', builder: (context, state) => const AiResultScreen()),
@@ -63,7 +62,7 @@ final appRouter = GoRouter(
     GoRoute(path: '/notifications', builder: (context, state) => const NotificationsScreen()),
     GoRoute(path: '/issues', builder: (context, state) => const BookingHistoryScreen()), // Issues list
 
-    // ─── Worker Flow ─────────────────────────────
+    // â”€â”€â”€ Worker Flow â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     GoRoute(path: '/worker/dashboard', builder: (context, state) => const WorkerDashboardScreen()),
     GoRoute(path: '/worker/requests', builder: (context, state) => const WorkerDashboardScreen()),
     GoRoute(path: '/worker/quote', builder: (context, state) => const QuoteSubmissionScreen()),
@@ -71,3 +70,4 @@ final appRouter = GoRouter(
     GoRoute(path: '/worker/profile', builder: (context, state) => const WorkerProfileScreen()),
   ],
 );
+

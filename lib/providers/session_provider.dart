@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/api_client.dart';
 
 enum UserRole { user, worker, none }
 
@@ -15,52 +16,72 @@ class Session {
   bool get isWorker => role == UserRole.worker;
 }
 
+/// Shared ApiClient instance — injected into all services.
+/// The SessionNotifier updates the token on login/logout.
+final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
+
 class SessionNotifier extends StateNotifier<Session> {
-  SessionNotifier() : super(const Session()) {
+  SessionNotifier(this._apiClient) : super(const Session()) {
     _restoreSession();
   }
+
+  final ApiClient _apiClient;
 
   static const _tokenKey = 'click2fix_auth_token';
   static const _roleKey = 'click2fix_user_role';
   static const _phoneKey = 'click2fix_user_phone';
   static const _nameKey = 'click2fix_user_name';
 
-  Future<void> _restoreSession() async {
+  /// Restore saved session from SharedPreferences on app start.
+  Future<bool> _restoreSession() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       final token = prefs.getString(_tokenKey);
-      if (token == null) return;
+      if (token == null) return false;
 
       final roleStr = prefs.getString(_roleKey) ?? 'none';
-      UserRole role;
-      switch (roleStr) {
-        case 'user':
-          role = UserRole.user;
-          break;
-        case 'worker':
-          role = UserRole.worker;
-          break;
-        default:
-          role = UserRole.none;
-      }
+      final role = _parseRole(roleStr);
+      if (role == UserRole.none) return false;
 
+      _apiClient.setToken(token);
       state = Session(
         token: token,
         role: role,
         phone: prefs.getString(_phoneKey),
         name: prefs.getString(_nameKey),
       );
+      return true;
     } catch (e) {
       debugPrint('Failed to restore session: $e');
+      return false;
+    }
+  }
+
+  /// Restore session and return whether one was found (for splash screen redirect).
+  Future<Session?> restoreAndReturn() async {
+    final found = await _restoreSession();
+    return found ? state : null;
+  }
+
+  UserRole _parseRole(String roleStr) {
+    switch (roleStr) {
+      case 'user':
+        return UserRole.user;
+      case 'worker':
+        return UserRole.worker;
+      default:
+        return UserRole.none;
     }
   }
 
   void login({required String token, required UserRole role, String? phone, String? name}) {
+    _apiClient.setToken(token);
     state = Session(token: token, role: role, phone: phone, name: name);
     _persistSession(token, role, phone, name);
   }
 
   void logout() {
+    _apiClient.setToken(null);
     state = const Session();
     _clearSession();
   }
@@ -91,5 +112,6 @@ class SessionNotifier extends StateNotifier<Session> {
 }
 
 final sessionProvider = StateNotifierProvider<SessionNotifier, Session>((ref) {
-  return SessionNotifier();
+  final client = ref.read(apiClientProvider);
+  return SessionNotifier(client);
 });

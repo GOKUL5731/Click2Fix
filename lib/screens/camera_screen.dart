@@ -1,13 +1,11 @@
-import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
-import 'package:go_router/go_router.dart';
 import 'dart:io';
+import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
 import '../services/camera_service.dart';
 
 class CameraScreen extends StatefulWidget {
   final bool isVideo;
-  
   const CameraScreen({super.key, this.isVideo = false});
 
   @override
@@ -16,145 +14,108 @@ class CameraScreen extends StatefulWidget {
 
 class _CameraScreenState extends State<CameraScreen> {
   final _cameraService = CameraService();
-  late CameraController? _controller;
-  bool _isRecording = false;
+  bool _isCapturing = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _initializeCamera();
-  }
+  Future<void> _capture() async {
+    if (_isCapturing) return;
+    setState(() => _isCapturing = true);
 
-  Future<void> _initializeCamera() async {
-    _controller = await _cameraService.initializeCamera();
-    if (mounted) {
-      setState(() {});
-    }
-  }
-
-  Future<void> _capturePhoto() async {
     try {
-      final file = await _cameraService.capturePhoto();
+      final File? file = widget.isVideo
+          ? await _cameraService.recordVideo()
+          : await _cameraService.capturePhoto();
+
       if (file != null && mounted) {
-        // Return the file path back to previous screen
         Navigator.of(context).pop(file);
+      } else if (mounted) {
+        setState(() => _isCapturing = false);
       }
     } catch (e) {
       if (mounted) {
+        setState(() => _isCapturing = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error capturing photo: $e')),
+          SnackBar(content: Text('Error: $e'), behavior: SnackBarBehavior.floating),
         );
       }
     }
   }
 
-  Future<void> _toggleVideoRecording() async {
-    try {
-      if (_isRecording) {
-        final file = await _cameraService.recordVideo();
-        if (file != null && mounted) {
-          Navigator.of(context).pop(file);
-        }
-      } else {
-        await _cameraService.recordVideo();
-        setState(() => _isRecording = true);
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error: $e')),
-        );
-      }
+  Future<void> _pickFromGallery() async {
+    final File? file = widget.isVideo
+        ? await _cameraService.pickVideoFromGallery()
+        : await _cameraService.pickFromGallery();
+    if (file != null && mounted) {
+      Navigator.of(context).pop(file);
     }
-  }
-
-  @override
-  void dispose() {
-    _cameraService.dispose();
-    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Camera')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return Scaffold(
+      backgroundColor: Colors.black,
       appBar: AppBar(
+        backgroundColor: Colors.black,
+        foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new, size: 20),
-          onPressed: () => Navigator.pop(context),
+          onPressed: () => context.pop(),
         ),
         title: Text(widget.isVideo ? 'Record Video' : 'Take Photo'),
       ),
-      body: Stack(
-        children: [
-          CameraPreview(_controller!),
-          Positioned(
-            bottom: 30,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Column(
-                children: [
-                  if (_isRecording)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.red.withAlpha(200),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: Colors.white,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Recording...',
-                            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                          ),
-                        ],
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      FloatingActionButton(
-                        onPressed: () => Navigator.pop(context),
-                        backgroundColor: Colors.grey[800],
-                        child: const Icon(Icons.close),
-                      ),
-                      const SizedBox(width: 20),
-                      FloatingActionButton(
-                        onPressed: widget.isVideo ? _toggleVideoRecording : _capturePhoto,
-                        backgroundColor: widget.isVideo && _isRecording
-                            ? Colors.red
-                            : AppColors.primaryBlue,
-                        child: Icon(
-                          widget.isVideo
-                              ? (_isRecording ? Icons.stop : Icons.videocam)
-                              : Icons.camera_alt,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 120,
+              height: 120,
+              decoration: BoxDecoration(
+                color: Colors.white.withAlpha(10),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white30),
+              ),
+              child: Icon(
+                widget.isVideo ? Icons.videocam : Icons.camera_alt,
+                size: 60,
+                color: Colors.white54,
               ),
             ),
-          ),
-        ],
+            const SizedBox(height: 32),
+            Text(
+              widget.isVideo ? 'Record a Video' : 'Take a Photo',
+              style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Your device camera will open instantly',
+              style: TextStyle(color: Colors.white54, fontSize: 14),
+            ),
+            const SizedBox(height: 48),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickFromGallery,
+                  icon: const Icon(Icons.photo_library, color: Colors.white70),
+                  label: const Text('Gallery', style: TextStyle(color: Colors.white70)),
+                  style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.white24)),
+                ),
+                const SizedBox(width: 16),
+                FilledButton.icon(
+                  onPressed: _isCapturing ? null : _capture,
+                  icon: _isCapturing
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      : Icon(widget.isVideo ? Icons.videocam : Icons.camera_alt),
+                  label: Text(widget.isVideo ? 'Record' : 'Camera'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

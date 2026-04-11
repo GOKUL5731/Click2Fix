@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
-import '../widgets/primary_action_button.dart';
 
 class EmergencyScreen extends StatelessWidget {
   const EmergencyScreen({super.key});
@@ -19,7 +18,7 @@ class EmergencyScreen extends StatelessWidget {
           // Big emergency button
           GestureDetector(
             onTap: () {
-              // Navigate to upload screen — the emergency toggle will be pre-set
+              // Navigate to upload screen â€” the emergency toggle will be pre-set
               context.go('/upload');
             },
             child: Container(
@@ -86,3 +85,4 @@ class _EmergencyType extends StatelessWidget {
     );
   }
 }
+

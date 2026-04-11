@@ -19,7 +19,7 @@ class AuthService {
     String? category,
     int? experience,
   }) async {
-    final response = await _client.post('/auth/register', {
+    final response = await _client.post('/api/auth/register', {
       'role': role,
       'phone': phone,
       if (name != null) 'name': name,
@@ -32,7 +32,7 @@ class AuthService {
 
   /// Request login OTP
   Future<Map<String, dynamic>> loginWithPhone(String phone, {String role = 'user'}) async {
-    final response = await _client.post('/auth/login', {
+    final response = await _client.post('/api/auth/login', {
       'role': role,
       'phone': phone,
     });
@@ -41,7 +41,7 @@ class AuthService {
 
   /// Verify OTP and get token
   Future<String> verifyOtp(String phone, String otp, {String role = 'user'}) async {
-    final response = await _client.post('/auth/verify-otp', {
+    final response = await _client.post('/api/auth/verify-otp', {
       'role': role,
       'phone': phone,
       'otp': otp,
@@ -53,17 +53,33 @@ class AuthService {
 
   /// Request upload OTP
   Future<Map<String, dynamic>> requestUploadOtp(String phone) async {
-    final response = await _client.post('/auth/request-upload-otp', {'phone': phone});
+    final response = await _client.post('/api/auth/request-upload-otp', {'phone': phone});
     return response.data as Map<String, dynamic>;
   }
 
   /// Verify upload OTP
   Future<String> verifyUploadOtp(String phone, String otp) async {
-    final response = await _client.post('/auth/verify-upload-otp', {
+    final response = await _client.post('/api/auth/verify-upload-otp', {
       'phone': phone,
       'otp': otp,
     });
     return response.data['uploadToken'] as String;
+  }
+
+  /// Firebase phone login
+  Future<Map<String, dynamic>> firebaseLogin({
+    required String idToken,
+    required String role,
+    String? phone,
+    String? name,
+  }) async {
+    final response = await _client.post('/api/auth/firebase-login', {
+      'idToken': idToken,
+      'role': role,
+      if (phone != null) 'phone': phone,
+      if (name != null) 'name': name,
+    });
+    return response.data as Map<String, dynamic>;
   }
 
   /// Save session to local storage

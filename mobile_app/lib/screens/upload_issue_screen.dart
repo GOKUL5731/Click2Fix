@@ -1,5 +1,7 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -409,12 +411,34 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.file(
-                  File(_imagePath!),
-                  width: double.infinity,
-                  height: 220,
-                  fit: BoxFit.cover,
-                ),
+                child: kIsWeb
+                    ? FutureBuilder<Uint8List>(
+                        future: File(_imagePath!).readAsBytes(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData) {
+                            return Image.memory(
+                              snapshot.data!,
+                              width: double.infinity,
+                              height: 220,
+                              fit: BoxFit.cover,
+                            );
+                          }
+                          return Container(
+                            width: double.infinity,
+                            height: 220,
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        },
+                      )
+                    : Image.file(
+                        File(_imagePath!),
+                        width: double.infinity,
+                        height: 220,
+                        fit: BoxFit.cover,
+                      ),
               ),
               Positioned(
                 top: 8,

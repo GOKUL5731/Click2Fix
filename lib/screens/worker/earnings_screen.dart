@@ -1,7 +1,6 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
-import '../../widgets/gradient_header.dart';
 
 class EarningsScreen extends StatelessWidget {
   const EarningsScreen({super.key});
@@ -21,12 +20,12 @@ class EarningsScreen extends StatelessWidget {
           child: Column(children: [
             Text('Total Earnings', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70)),
             const SizedBox(height: 8),
-            Text('₹24,750', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+            Text('â‚¹24,750', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
             const SizedBox(height: 16),
             Row(children: [
-              Expanded(child: _EarnStat(label: 'This Week', value: '₹4,200')),
+              Expanded(child: _EarnStat(label: 'This Week', value: 'â‚¹4,200')),
               Container(width: 1, height: 30, color: Colors.white24),
-              Expanded(child: _EarnStat(label: 'This Month', value: '₹12,500')),
+              Expanded(child: _EarnStat(label: 'This Month', value: 'â‚¹12,500')),
               Container(width: 1, height: 30, color: Colors.white24),
               Expanded(child: _EarnStat(label: 'Jobs Done', value: '127')),
             ]),
@@ -58,10 +57,10 @@ class EarningsScreen extends StatelessWidget {
   }
 
   static final _transactions = [
-    (title: 'Pipe Repair — Priya S.', date: '10 Apr 2026', amount: '₹450'),
-    (title: 'Wiring Fix — Karthik R.', date: '09 Apr 2026', amount: '₹720'),
-    (title: 'Tap Replacement — Arun M.', date: '08 Apr 2026', amount: '₹350'),
-    (title: 'AC Service — Lakshmi J.', date: '06 Apr 2026', amount: '₹550'),
+    (title: 'Pipe Repair â€” Priya S.', date: '10 Apr 2026', amount: 'â‚¹450'),
+    (title: 'Wiring Fix â€” Karthik R.', date: '09 Apr 2026', amount: 'â‚¹720'),
+    (title: 'Tap Replacement â€” Arun M.', date: '08 Apr 2026', amount: 'â‚¹350'),
+    (title: 'AC Service â€” Lakshmi J.', date: '06 Apr 2026', amount: 'â‚¹550'),
   ];
 }
 
@@ -75,3 +74,4 @@ class _EarnStat extends StatelessWidget {
     Text(label, style: const TextStyle(color: Colors.white60, fontSize: 11)),
   ]);
 }
+

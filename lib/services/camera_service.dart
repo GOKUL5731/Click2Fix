@@ -1,118 +1,85 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:io';
-import 'package:flutter/material.dart';
-import 'package:camera/camera.dart';
+import 'package:flutter/foundation.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 
+/// Camera/media service built on image_picker.
+/// No camera package dependency â€” works on Android, iOS, and Web.
 class CameraService {
   static final CameraService _instance = CameraService._internal();
-  
-  factory CameraService() {
-    return _instance;
-  }
-  
+
+  factory CameraService() => _instance;
   CameraService._internal();
 
-  CameraController? _controller;
   final _imagePicker = ImagePicker();
 
-  /// Initialize camera for live preview
-  Future<CameraController?> initializeCamera() async {
-    try {
-      final cameras = await availableCameras();
-      if (cameras.isEmpty) return null;
-      
-      final frontCamera = cameras.firstWhere(
-        (camera) => camera.lensDirection == CameraLensDirection.front,
-        orElse: () => cameras.first,
-      );
+  bool get isRecording => false;
 
-      _controller = CameraController(
-        frontCamera,
-        ResolutionPreset.high,
-      );
+  // Stub controller â€” kept for API compatibility with camera_screen.dart
+  dynamic get controller => null;
 
-      await _controller!.initialize();
-      return _controller;
-    } catch (e) {
-      print('Error initializing camera: $e');
-      return null;
-    }
-  }
+  /// Initialize "camera" â€” no-op since we use image_picker instead
+  Future<dynamic> initializeCamera() async => null;
 
-  CameraController? get controller => _controller;
-
-  /// Capture photo from camera
+  /// Capture photo from camera using image_picker
   Future<File?> capturePhoto() async {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      return null;
-    }
-
     try {
-      final image = await _controller!.takePicture();
-      return File(image.path);
+      final picked = await _imagePicker.pickImage(
+        source: ImageSource.camera,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
+      );
+      if (picked == null) return null;
+      if (kIsWeb) return null; // Web doesn't have dart:io File
+      return File(picked.path);
     } catch (e) {
-      print('Error capturing photo: $e');
+      debugPrint('CameraService capturePhoto error: $e');
       return null;
     }
   }
 
-  /// Record video
+  /// Record video using image_picker
   Future<File?> recordVideo() async {
-    if (_controller == null || !_controller!.value.isInitialized) {
-      return null;
-    }
-
     try {
-      if (_controller!.value.isRecordingVideo) {
-        final file = await _controller!.stopVideoRecording();
-        return File(file.path);
-      } else {
-        await _controller!.startVideoRecording();
-        return null; // Return null while recording
-      }
+      final picked = await _imagePicker.pickVideo(source: ImageSource.camera);
+      if (picked == null) return null;
+      if (kIsWeb) return null;
+      return File(picked.path);
     } catch (e) {
-      print('Error recording video: $e');
+      debugPrint('CameraService recordVideo error: $e');
       return null;
     }
   }
 
-  /// Get photo from gallery
+  /// Pick photo from gallery
   Future<File?> pickFromGallery() async {
     try {
-      final XFile? image = await _imagePicker.pickImage(source: ImageSource.gallery);
-      if (image != null) {
-        return File(image.path);
-      }
-      return null;
+      final picked = await _imagePicker.pickImage(source: ImageSource.gallery);
+      if (picked == null) return null;
+      if (kIsWeb) return null;
+      return File(picked.path);
     } catch (e) {
-      print('Error picking from gallery: $e');
+      debugPrint('CameraService pickFromGallery error: $e');
       return null;
     }
   }
 
-  /// Get video from gallery
+  /// Pick video from gallery
   Future<File?> pickVideoFromGallery() async {
     try {
-      final XFile? video = await _imagePicker.pickVideo(source: ImageSource.gallery);
-      if (video != null) {
-        return File(video.path);
-      }
-      return null;
+      final picked = await _imagePicker.pickVideo(source: ImageSource.gallery);
+      if (picked == null) return null;
+      if (kIsWeb) return null;
+      return File(picked.path);
     } catch (e) {
-      print('Error picking video: $e');
+      debugPrint('CameraService pickVideoFromGallery error: $e');
       return null;
     }
   }
 
-  /// Dispose camera
   Future<void> dispose() async {
-    if (_controller != null) {
-      await _controller!.dispose();
-      _controller = null;
-    }
+    // No resources to release with image_picker approach
   }
-
-  bool get isRecording => _controller?.value.isRecordingVideo ?? false;
 }
+

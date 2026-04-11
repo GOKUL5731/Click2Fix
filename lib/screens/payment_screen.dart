@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
 import '../widgets/primary_action_button.dart';
@@ -22,7 +22,6 @@ class _PaymentScreenState extends State<PaymentScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(title: const Text('Payment')),
       body: SingleChildScrollView(
@@ -35,9 +34,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
             child: Column(children: [
               Text('Total Amount', style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70)),
               const SizedBox(height: 8),
-              Text('₹495', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
+              Text('â‚¹495', style: Theme.of(context).textTheme.displayMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w800)),
               const SizedBox(height: 4),
-              Text('Including ₹45 platform fee', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54)),
+              Text('Including â‚¹45 platform fee', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white54)),
             ]),
           ),
           const SizedBox(height: 24),
@@ -49,12 +48,12 @@ class _PaymentScreenState extends State<PaymentScreen> {
           const SizedBox(height: 8),
           _PayMethod(icon: Icons.money, label: 'Cash', sub: 'Pay after service', isActive: _method == 'cash', onTap: () => setState(() => _method = 'cash')),
           const SizedBox(height: 28),
-          PrimaryActionButton(label: 'Pay ₹495', icon: Icons.lock, isLoading: _isProcessing, onPressed: _pay),
+          PrimaryActionButton(label: 'Pay â‚¹495', icon: Icons.lock, isLoading: _isProcessing, onPressed: _pay),
           const SizedBox(height: 14),
           Row(mainAxisAlignment: MainAxisAlignment.center, children: [
             Icon(Icons.shield_outlined, size: 14, color: AppColors.textHint),
             const SizedBox(width: 6),
-            Text('Secure payment • SSL encrypted', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint)),
+            Text('Secure payment â€¢ SSL encrypted', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint)),
           ]),
         ]),
       ),
@@ -90,3 +89,5 @@ class _PayMethod extends StatelessWidget {
     );
   }
 }
+
+

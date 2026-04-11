@@ -1,5 +1,4 @@
-import 'dart:io';
-import 'package:dio/dio.dart';
+﻿import 'package:dio/dio.dart';
 import 'api_client.dart';
 
 class WorkerService {
@@ -9,13 +8,13 @@ class WorkerService {
 
   /// Get worker profile
   Future<Map<String, dynamic>> getProfile() async {
-    final response = await _client.get('/worker/profile');
+    final response = await _client.get('/api/worker/profile');
     return response.data as Map<String, dynamic>;
   }
 
   /// Toggle availability
   Future<Map<String, dynamic>> setAvailability(bool isAvailable) async {
-    final response = await _client.put('/worker/availability', {
+    final response = await _client.put('/api/worker/availability', {
       'availability': isAvailable,
     });
     return response.data as Map<String, dynamic>;
@@ -23,7 +22,7 @@ class WorkerService {
 
   /// Update real-time location
   Future<Map<String, dynamic>> updateLocation(double latitude, double longitude) async {
-    final response = await _client.put('/worker/location', {
+    final response = await _client.put('/api/worker/location', {
       'latitude': latitude,
       'longitude': longitude,
     });
@@ -31,8 +30,13 @@ class WorkerService {
   }
 
   /// Send a quote for an issue
-  Future<Map<String, dynamic>> sendQuote(String issueId, double price, int etaMinutes, String? message) async {
-    final response = await _client.post('/worker/quote', {
+  Future<Map<String, dynamic>> sendQuote(
+    String issueId,
+    double price,
+    int etaMinutes,
+    String? message,
+  ) async {
+    final response = await _client.post('/api/worker/quote', {
       'issueId': issueId,
       'price': price,
       'estimatedTime': etaMinutes,
@@ -44,7 +48,7 @@ class WorkerService {
   /// Upload a document (Aadhaar or certificate)
   Future<Map<String, dynamic>> uploadDocument(String documentType, String filePath) async {
     final response = await _client.uploadFiles(
-      '/worker/document',
+      '/api/worker/document',
       fields: {'documentType': documentType},
       files: [
         MapEntry(
@@ -56,9 +60,13 @@ class WorkerService {
     return response.data as Map<String, dynamic>;
   }
 
-  /// Fetch dashboard data (nearby issues assigned to category)
-  Future<List<dynamic>> getNearbyRequests(double latitude, double longitude, String category) async {
-    final response = await _client.get('/worker/nearby', queryParameters: {
+  /// Fetch nearby issues assigned to category
+  Future<List<dynamic>> getNearbyRequests(
+    double latitude,
+    double longitude,
+    String category,
+  ) async {
+    final response = await _client.get('/api/worker/nearby', queryParameters: {
       'latitude': latitude.toString(),
       'longitude': longitude.toString(),
       'category': category,
@@ -66,3 +74,4 @@ class WorkerService {
     return response.data as List<dynamic>;
   }
 }
+

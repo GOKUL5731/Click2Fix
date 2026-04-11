@@ -18,7 +18,6 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => context.go('/profile')),
@@ -28,7 +27,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
         _Section(title: 'Appearance'),
         _ToggleTile(icon: Icons.dark_mode, label: 'Dark Mode', value: _darkMode, onChanged: (v) => setState(() => _darkMode = v)),
         _DropdownTile(icon: Icons.language, label: 'Language', value: _language,
-          options: ['English', 'Tamil', 'Hindi', 'Telugu'],
+          options: const ['English', 'Tamil', 'Hindi', 'Telugu'],
           onChanged: (v) => setState(() => _language = v)),
         const SizedBox(height: 16),
         _Section(title: 'Privacy'),
@@ -46,7 +45,8 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
         const SizedBox(height: 24),
         SizedBox(width: double.infinity, child: OutlinedButton.icon(
           onPressed: () { ref.read(sessionProvider.notifier).logout(); context.go('/login'); },
-          icon: const Icon(Icons.logout, color: AppColors.emergencyRed), label: const Text('Logout', style: TextStyle(color: AppColors.emergencyRed)),
+          icon: const Icon(Icons.logout, color: AppColors.emergencyRed),
+          label: const Text('Logout', style: TextStyle(color: AppColors.emergencyRed)),
           style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.emergencyRed), padding: const EdgeInsets.all(14)),
         )),
       ]),
@@ -71,12 +71,13 @@ class _ToggleTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(color: isDark ? AppColors.cardDark : Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? Colors.white10 : AppColors.divider)),
       child: Row(children: [
         Icon(icon, size: 20, color: AppColors.primaryBlue), const SizedBox(width: 14),
         Expanded(child: Text(label, style: Theme.of(context).textTheme.titleSmall)),
-        Switch(value: value, onChanged: onChanged),
+        Switch(value: value, onChanged: onChanged, activeColor: AppColors.primaryBlue),
       ]),
     );
   }
@@ -89,13 +90,17 @@ class _DropdownTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
-      margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
       decoration: BoxDecoration(color: isDark ? AppColors.cardDark : Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? Colors.white10 : AppColors.divider)),
       child: Row(children: [
         Icon(icon, size: 20, color: AppColors.primaryBlue), const SizedBox(width: 14),
         Expanded(child: Text(label, style: Theme.of(context).textTheme.titleSmall)),
-        DropdownButton<String>(value: value, underline: const SizedBox(), items: options.map((o) => DropdownMenuItem(value: o, child: Text(o, style: const TextStyle(fontSize: 13)))).toList(),
-          onChanged: (v) { if (v != null) onChanged(v); }),
+        DropdownButton<String>(
+          value: value, underline: const SizedBox(),
+          items: options.map((o) => DropdownMenuItem(value: o, child: Text(o, style: const TextStyle(fontSize: 13)))).toList(),
+          onChanged: (v) { if (v != null) onChanged(v); },
+        ),
       ]),
     );
   }
@@ -110,13 +115,16 @@ class _ActionTile extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 8), padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         decoration: BoxDecoration(color: isDark ? AppColors.cardDark : Colors.white, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? Colors.white10 : AppColors.divider)),
         child: Row(children: [
           Icon(icon, size: 20, color: color ?? AppColors.textSecondary), const SizedBox(width: 14),
           Expanded(child: Text(label, style: Theme.of(context).textTheme.titleSmall?.copyWith(color: color))),
-          if (trailing != null) Text(trailing!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint))
-          else Icon(Icons.chevron_right, size: 20, color: AppColors.textHint),
+          if (trailing != null)
+            Text(trailing!, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint))
+          else
+            Icon(Icons.chevron_right, size: 20, color: AppColors.textHint),
         ]),
       ),
     );

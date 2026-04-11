@@ -1,4 +1,4 @@
-import 'api_client.dart';
+﻿import 'api_client.dart';
 
 class BookingService {
   BookingService(this._client);
@@ -11,7 +11,7 @@ class BookingService {
     required String workerId,
     String? quotationId,
   }) async {
-    final response = await _client.post('/booking', {
+    final response = await _client.post('/api/booking/create', {
       'issueId': issueId,
       'workerId': workerId,
       if (quotationId != null) 'quotationId': quotationId,
@@ -21,21 +21,40 @@ class BookingService {
 
   /// Get booking history
   Future<List<dynamic>> getHistory() async {
-    final response = await _client.get('/booking/history');
+    final response = await _client.get('/api/booking/history');
     return response.data as List<dynamic>;
   }
 
   /// Get live worker location for a booking
   Future<Map<String, dynamic>?> getLiveLocation(String bookingId) async {
-    final response = await _client.get('/booking/$bookingId/location');
+    final response = await _client.get(
+      '/api/booking/live-location',
+      queryParameters: {'bookingId': bookingId},
+    );
     return response.data as Map<String, dynamic>?;
   }
 
-  /// Complete a booking with OTP
+  /// Complete a booking (worker calls this)
   Future<Map<String, dynamic>> completeBooking(String bookingId, {String? otp}) async {
-    final response = await _client.post('/booking/complete', {
+    final response = await _client.post('/api/booking/complete', {
       'bookingId': bookingId,
       if (otp != null) 'completionOtp': otp,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Submit a rating for a completed booking
+  Future<Map<String, dynamic>> submitRating({
+    required String bookingId,
+    required String workerId,
+    required int rating,
+    String? comment,
+  }) async {
+    final response = await _client.post('/api/review/add', {
+      'bookingId': bookingId,
+      'workerId': workerId,
+      'rating': rating,
+      if (comment != null && comment.isNotEmpty) 'comment': comment,
     });
     return response.data as Map<String, dynamic>;
   }
@@ -47,7 +66,7 @@ class BookingService {
     double? longitude,
     String? category,
   }) async {
-    final response = await _client.get('/worker/nearby', queryParameters: {
+    final response = await _client.get('/api/worker/nearby', queryParameters: {
       if (issueId != null) 'issueId': issueId,
       if (latitude != null) 'latitude': latitude.toString(),
       if (longitude != null) 'longitude': longitude.toString(),
@@ -58,7 +77,8 @@ class BookingService {
 
   /// Get quotations for an issue
   Future<List<dynamic>> getQuotations(String issueId) async {
-    final response = await _client.get('/worker/quotations/$issueId');
+    final response = await _client.get('/api/worker/quotations/$issueId');
     return response.data as List<dynamic>;
   }
 }
+

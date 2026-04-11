@@ -8,6 +8,7 @@ import { notificationRoutes } from './notification.routes';
 import { paymentRoutes } from './payment.routes';
 import { reviewRoutes } from './review.routes';
 import { workerRoutes } from './worker.routes';
+import { versionRoutes } from './version.routes';
 
 export const routes = Router();
 
@@ -20,4 +21,4 @@ routes.use('/notifications', notificationRoutes);
 routes.use('/payment', paymentRoutes);
 routes.use('/review', reviewRoutes);
 routes.use('/admin', adminRoutes);
-
+routes.use('/app', versionRoutes);
