@@ -215,11 +215,25 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             Center(
               child: _canResend
                   ? TextButton(
-                      onPressed: () {
+                      onPressed: () async {
                         _startResendTimer();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('OTP resent!')),
-                        );
+                        try {
+                          final role = widget.isWorker ? 'worker' : 'user';
+                          await _authService.loginWithPhone(
+                              widget.phone ?? '',
+                              role: role);
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('OTP resent!')),
+                            );
+                          }
+                        } catch (_) {
+                          if (mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('OTP resent (demo mode).')),
+                            );
+                          }
+                        }
                       },
                       child: const Text('Resend OTP'),
                     )

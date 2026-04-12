@@ -5,13 +5,13 @@ class BookingService {
 
   final ApiClient _client;
 
-  /// Create a booking
+  /// Create a booking — backend: POST /booking/create
   Future<Map<String, dynamic>> createBooking({
     required String issueId,
     required String workerId,
     String? quotationId,
   }) async {
-    final response = await _client.post('/booking', {
+    final response = await _client.post('/booking/create', {
       'issueId': issueId,
       'workerId': workerId,
       if (quotationId != null) 'quotationId': quotationId,
@@ -19,20 +19,29 @@ class BookingService {
     return response.data as Map<String, dynamic>;
   }
 
-  /// Get booking history
+  /// Get booking history — backend: GET /booking/history
   Future<List<dynamic>> getHistory() async {
     final response = await _client.get('/booking/history');
-    return response.data as List<dynamic>;
+    final data = response.data;
+    if (data is List) return data;
+    if (data is Map && data['bookings'] is List) return data['bookings'] as List;
+    return [];
   }
 
-  /// Get live worker location for a booking
+  /// Get live worker location — backend: GET /booking/live-location?bookingId=...
   Future<Map<String, dynamic>?> getLiveLocation(String bookingId) async {
-    final response = await _client.get('/booking/$bookingId/location');
+    final response = await _client.get(
+      '/booking/live-location',
+      queryParameters: {'bookingId': bookingId},
+    );
     return response.data as Map<String, dynamic>?;
   }
 
-  /// Complete a booking with OTP
-  Future<Map<String, dynamic>> completeBooking(String bookingId, {String? otp}) async {
+  /// Complete a booking with OTP — backend: POST /booking/complete
+  Future<Map<String, dynamic>> completeBooking(
+    String bookingId, {
+    String? otp,
+  }) async {
     final response = await _client.post('/booking/complete', {
       'bookingId': bookingId,
       if (otp != null) 'completionOtp': otp,
@@ -40,7 +49,7 @@ class BookingService {
     return response.data as Map<String, dynamic>;
   }
 
-  /// Get nearby workers for an issue
+  /// Get nearby workers — backend: GET /worker/nearby
   Future<List<dynamic>> getNearbyWorkers({
     String? issueId,
     double? latitude,
@@ -53,12 +62,18 @@ class BookingService {
       if (longitude != null) 'longitude': longitude.toString(),
       if (category != null) 'category': category,
     });
-    return response.data as List<dynamic>;
+    final data = response.data;
+    if (data is List) return data;
+    if (data is Map && data['workers'] is List) return data['workers'] as List;
+    return [];
   }
 
-  /// Get quotations for an issue
+  /// Get quotations for an issue — backend: GET /worker/quotations/:issueId
   Future<List<dynamic>> getQuotations(String issueId) async {
     final response = await _client.get('/worker/quotations/$issueId');
-    return response.data as List<dynamic>;
+    final data = response.data;
+    if (data is List) return data;
+    if (data is Map && data['quotations'] is List) return data['quotations'] as List;
+    return [];
   }
 }
