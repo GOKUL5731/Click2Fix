@@ -9,13 +9,18 @@ class GoogleAuthService {
   
   GoogleAuthService(this._client);
 
-  static final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-  );
+  bool _initialized = false;
 
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (!_initialized) {
+        await GoogleSignIn.instance.initialize();
+        _initialized = true;
+      }
+      
+      final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate(
+        scopeHint: const ['email', 'profile'],
+      );
       
       if (googleUser == null) {
         return null;
@@ -62,7 +67,7 @@ class GoogleAuthService {
 
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      await GoogleSignIn.instance.signOut();
       await FirebaseAuth.instance.signOut();
     } catch (e) {
       debugPrint('Google Sign out error: \$e');

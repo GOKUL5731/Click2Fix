@@ -31,7 +31,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     (
       title: 'Fix',
       subtitle: 'Book instantly, track live, chat with worker, pay securely, and rate the service. That simple!',
-      icon: Icons.success,
+      icon: Icons.check_circle_rounded,
       color: AppColors.success,
     ),
   ];
