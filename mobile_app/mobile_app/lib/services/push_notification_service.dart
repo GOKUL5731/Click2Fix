@@ -1,25 +1,78 @@
-﻿import 'package:flutter/foundation.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:flutter/foundation.dart';
 import 'api_client.dart';
 
-/// Push Notification Service
-/// Firebase FCM is optional â€” the app gracefully degrades if not configured.
-/// To enable real push notifications, add firebase_core and firebase_messaging
-/// to pubspec.yaml and place google-services.json in android/app/.
-class PushNotificationService {
-  bool _initialized = false;
+/// Background message handler — must be a top-level function.
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  debugPrint('FCM background message: ${message.messageId}');
+}
 
+/// Push Notification Service — wraps Firebase Cloud Messaging (FCM).
+class PushNotificationService {
+  static final PushNotificationService _instance =
+      PushNotificationService._internal();
+  factory PushNotificationService() => _instance;
+  PushNotificationService._internal();
+
+  bool _initialized = false;
+  String? _fcmToken;
+
+  /// Call once at app startup (after Firebase.initializeApp()).
   Future<void> initialize() async {
     if (_initialized) return;
-    // Firebase initialization is deferred â€” add firebase packages when ready
+
+    // Register background handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+    // Request permission on iOS / Android 13+
+    final messaging = FirebaseMessaging.instance;
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    debugPrint(
+        'FCM permission: ${settings.authorizationStatus.name}');
+
+    // Foreground notification display on Android
+    await FirebaseMessaging.instance
+        .setForegroundNotificationPresentationOptions(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    // Listen for foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      debugPrint(
+          'FCM foreground message: ${message.notification?.title} — ${message.notification?.body}');
+    });
+
+    // Fetch initial token
+    _fcmToken = await messaging.getToken();
+    debugPrint('FCM device token: $_fcmToken');
+
+    // Refresh token callback
+    messaging.onTokenRefresh.listen((newToken) {
+      _fcmToken = newToken;
+      debugPrint('FCM token refreshed: $newToken');
+    });
+
     _initialized = true;
-    debugPrint('PushNotificationService: Firebase not yet configured. Skipping FCM init.');
   }
 
+  /// Returns the FCM device token (null if not available).
   Future<String?> getDeviceToken() async {
-    // Returns null until Firebase is configured
-    return null;
+    if (!_initialized) await initialize();
+    _fcmToken ??= await FirebaseMessaging.instance.getToken();
+    return _fcmToken;
   }
 
+  /// Registers the device FCM token with the Click2Fix backend.
   Future<void> registerDeviceToken({
     required ApiClient apiClient,
     required String authToken,
@@ -35,6 +88,7 @@ class PushNotificationService {
         'platform': _platformName,
         'appVariant': appVariant,
       });
+      debugPrint('FCM token registered with backend.');
     } catch (error) {
       debugPrint('FCM token registration failed: $error');
     }
@@ -52,4 +106,3 @@ class PushNotificationService {
     }
   }
 }
-

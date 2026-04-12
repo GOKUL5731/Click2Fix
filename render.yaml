@@ -12,18 +12,38 @@ services:
       - key: NODE_ENV
         value: production
       - key: PORT
-        value: 8080
+        value: 10000
       - key: JWT_SECRET
         fromSecret: JWT_SECRET
+      - key: JWT_EXPIRES_IN
+        value: 1h
       - key: DATABASE_URL
         fromSecret: DATABASE_URL
       - key: DIRECT_URL
         fromSecret: DIRECT_URL
       - key: REDIS_URL
         fromSecret: REDIS_URL
-      - key: AI_SERVICE_URL
-        value: https://click2fix-ai-service.render.com
+      - key: SUPABASE_URL
+        fromSecret: SUPABASE_URL
+      - key: SUPABASE_ANON_KEY
+        fromSecret: SUPABASE_ANON_KEY
+      - key: FIREBASE_PROJECT_ID
+        value: click2fix-74b5d
+      - key: FIREBASE_CLIENT_EMAIL
+        fromSecret: FIREBASE_CLIENT_EMAIL
+      - key: FIREBASE_PRIVATE_KEY
+        fromSecret: FIREBASE_PRIVATE_KEY
+      - key: FIREBASE_STORAGE_BUCKET
+        value: click2fix-74b5d.firebasestorage.app
+      - key: FIREBASE_DATABASE_URL
+        value: https://click2fix-74b5d-default-rtdb.firebaseio.com
+      - key: TWILIO_ACCOUNT_SID
+        fromSecret: TWILIO_ACCOUNT_SID
+      - key: TWILIO_AUTH_TOKEN
+        fromSecret: TWILIO_AUTH_TOKEN
+      - key: TWILIO_VERIFY_SERVICE_SID
+        fromSecret: TWILIO_VERIFY_SERVICE_SID
       - key: CORS_ORIGINS
-        value: https://click2fix-admin.render.com,https://yourdomain.com
+        value: https://click2fix-backend.onrender.com
     autoDeploy: true
     region: oregon

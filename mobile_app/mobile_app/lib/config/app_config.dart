@@ -7,14 +7,16 @@ class AppConfig {
     defaultValue: 'development',
   );
 
+  /// Production: https://click2fix-backend.onrender.com
+  /// Development: http://localhost:8080
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue: 'https://click2fix-backend.onrender.com',
   );
 
   static const socketUrl = String.fromEnvironment(
     'SOCKET_URL',
-    defaultValue: 'http://localhost:8080',
+    defaultValue: 'https://click2fix-backend.onrender.com',
   );
 
   static const googleMapsApiKey = String.fromEnvironment(
@@ -39,6 +41,6 @@ class AppConfig {
 
   static const firebaseWebProjectId = String.fromEnvironment(
     'FIREBASE_WEB_PROJECT_ID',
-    defaultValue: '',
+    defaultValue: 'click2fix-74b5d',
   );
 }
