@@ -12,12 +12,16 @@ class AppConfig {
   static const _configuredApiBase = String.fromEnvironment('API_BASE_URL');
   static const _configuredSocket = String.fromEnvironment('SOCKET_URL');
 
-  /// Production Render URL (HTTPS). Override with `--dart-define=API_BASE_URL=...` if your service URL changes.
+  /// Host only (no `/api`) — used for WebSocket defaults. API calls use [apiBaseUrl].
   static const _defaultBackendHost = 'https://click2fix-backend.onrender.com';
 
-  static String get apiBaseUrl => _normalizeBaseUrl(
-        _configuredApiBase.trim().isEmpty ? _defaultBackendHost : _configuredApiBase,
-      );
+  /// REST base includes `/api` so paths are `/auth/...`, `/app/...` (not `/api/auth/...` on top of host).
+  static const _defaultApiBase = '$_defaultBackendHost/api';
+
+  static String get apiBaseUrl {
+    final raw = _configuredApiBase.trim().isEmpty ? _defaultApiBase : _configuredApiBase.trim();
+    return _ensureApiSuffix(_normalizeBaseUrl(raw));
+  }
 
   static String get socketUrl => _normalizeBaseUrl(
         _configuredSocket.trim().isEmpty ? _defaultBackendHost : _configuredSocket,
@@ -63,5 +67,12 @@ class AppConfig {
       }
     }
     return normalized;
+  }
+
+  /// Ensures the base URL ends with `/api` (single suffix). Accepts defines like `https://host` or `https://host/api`.
+  static String _ensureApiSuffix(String normalized) {
+    var s = normalized.replaceAll(RegExp(r'/+$'), '');
+    if (s.endsWith('/api')) return s;
+    return '$s/api';
   }
 }

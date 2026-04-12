@@ -93,10 +93,10 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       final client = ref.read(apiClientProvider);
       Map<String, dynamic> data;
       try {
-        final response = await client.get('/api/app/version');
+        final response = await client.get('/app/version');
         data = Map<String, dynamic>.from(response.data as Map);
       } catch (_) {
-        final response = await client.get('/api/app/');
+        final response = await client.get('/app/');
         data = Map<String, dynamic>.from(response.data as Map);
       }
 

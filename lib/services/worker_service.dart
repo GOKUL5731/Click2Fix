@@ -8,13 +8,13 @@ class WorkerService {
 
   /// Get worker profile
   Future<Map<String, dynamic>> getProfile() async {
-    final response = await _client.get('/api/worker/profile');
+    final response = await _client.get('/worker/profile');
     return response.data as Map<String, dynamic>;
   }
 
   /// Toggle availability
   Future<Map<String, dynamic>> setAvailability(bool isAvailable) async {
-    final response = await _client.put('/api/worker/availability', {
+    final response = await _client.put('/worker/availability', {
       'availability': isAvailable,
     });
     return response.data as Map<String, dynamic>;
@@ -22,7 +22,7 @@ class WorkerService {
 
   /// Update real-time location
   Future<Map<String, dynamic>> updateLocation(double latitude, double longitude) async {
-    final response = await _client.put('/api/worker/location', {
+    final response = await _client.put('/worker/location', {
       'latitude': latitude,
       'longitude': longitude,
     });
@@ -36,7 +36,7 @@ class WorkerService {
     int etaMinutes,
     String? message,
   ) async {
-    final response = await _client.post('/api/worker/quote', {
+    final response = await _client.post('/worker/quote', {
       'issueId': issueId,
       'price': price,
       'estimatedTime': etaMinutes,
@@ -48,7 +48,7 @@ class WorkerService {
   /// Upload a document (Aadhaar or certificate)
   Future<Map<String, dynamic>> uploadDocument(String documentType, String filePath) async {
     final response = await _client.uploadFiles(
-      '/api/worker/document',
+      '/worker/document',
       fields: {'documentType': documentType},
       files: [
         MapEntry(
@@ -66,7 +66,7 @@ class WorkerService {
     double longitude,
     String category,
   ) async {
-    final response = await _client.get('/api/worker/nearby', queryParameters: {
+    final response = await _client.get('/worker/nearby', queryParameters: {
       'latitude': latitude.toString(),
       'longitude': longitude.toString(),
       'category': category,

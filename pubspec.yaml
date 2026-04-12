@@ -1,7 +1,7 @@
 name: click2fix_mobile_app
 description: Click2Fix – AI-powered home repair marketplace.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.1+2
 
 environment:
   sdk: ">=3.5.0 <4.0.0"

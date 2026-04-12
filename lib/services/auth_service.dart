@@ -19,7 +19,7 @@ class AuthService {
     String? category,
     int? experience,
   }) async {
-    final response = await _client.post('/api/auth/register', {
+    final response = await _client.post('/auth/register', {
       'role': role,
       'phone': phone,
       if (name != null && name.isNotEmpty) 'name': name,
@@ -34,7 +34,7 @@ class AuthService {
     String phone, {
     String role = 'user',
   }) async {
-    final response = await _client.post('/api/auth/login', {
+    final response = await _client.post('/auth/login', {
       'role': role,
       'phone': phone,
     });
@@ -46,7 +46,7 @@ class AuthService {
     String otp, {
     String role = 'user',
   }) async {
-    final response = await _client.post('/api/auth/verify-otp', {
+    final response = await _client.post('/auth/verify-otp', {
       'role': role,
       'phone': phone,
       'otp': otp,
@@ -61,14 +61,14 @@ class AuthService {
   }
 
   Future<Map<String, dynamic>> requestUploadOtp(String phone) async {
-    final response = await _client.post('/api/auth/request-upload-otp', {
+    final response = await _client.post('/auth/request-upload-otp', {
       'phone': phone,
     });
     return _asMap(response.data);
   }
 
   Future<String> verifyUploadOtp(String phone, String otp) async {
-    final response = await _client.post('/api/auth/verify-upload-otp', {
+    final response = await _client.post('/auth/verify-upload-otp', {
       'phone': phone,
       'otp': otp,
     });
@@ -88,7 +88,7 @@ class AuthService {
     String? category,
     int? experience,
   }) async {
-    final response = await _client.post('/api/auth/firebase-login', {
+    final response = await _client.post('/auth/firebase-login', {
       'idToken': idToken,
       'role': role,
       if (phone != null && phone.isNotEmpty) 'phone': phone,

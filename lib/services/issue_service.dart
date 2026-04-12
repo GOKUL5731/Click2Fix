@@ -57,7 +57,7 @@ class IssueService {
     }
 
     final response = await _client.uploadFiles(
-      '/api/issues',
+      '/issues',
       fields: fields,
       files: files.isNotEmpty ? files : null,
     );
@@ -66,13 +66,13 @@ class IssueService {
 
   /// Get issue details
   Future<Map<String, dynamic>> getIssue(String issueId) async {
-    final response = await _client.get('/api/issues/$issueId');
+    final response = await _client.get('/issues/$issueId');
     return response.data as Map<String, dynamic>;
   }
 
   /// Get current user's issues
   Future<List<dynamic>> getMyIssues() async {
-    final response = await _client.get('/api/issues/my');
+    final response = await _client.get('/issues/my');
     return response.data as List<dynamic>;
   }
 
@@ -92,7 +92,7 @@ class IssueService {
     final formData = FormData.fromMap({'file': file});
 
     final response =
-        await _client.postMultipart('/api/ai/analyze-image-file', formData);
+        await _client.postMultipart('/ai/analyze-image-file', formData);
     final data = response.data;
     if (data is Map<String, dynamic>) return data;
     if (data is Map) {
@@ -107,7 +107,7 @@ class IssueService {
 
   /// Get AI analysis for an image URL
   Future<Map<String, dynamic>> analyzeImage(String imageUrl) async {
-    final response = await _client.post('/api/ai/detect-issue', {
+    final response = await _client.post('/ai/detect-issue', {
       'imageUrl': imageUrl,
     });
     return response.data as Map<String, dynamic>;

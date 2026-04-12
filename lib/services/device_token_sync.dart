@@ -18,7 +18,7 @@ Future<void> syncFcmDeviceToken(ApiClient client) async {
       TargetPlatform.iOS => 'ios',
       _ => 'unknown',
     };
-    await client.post('/api/notifications/register-token', {
+    await client.post('/notifications/register-token', {
       'fcmToken': token,
       'platform': platform,
       'appVariant': 'mobile',

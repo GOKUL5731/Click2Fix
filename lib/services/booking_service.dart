@@ -11,7 +11,7 @@ class BookingService {
     required String workerId,
     String? quotationId,
   }) async {
-    final response = await _client.post('/api/booking/create', {
+    final response = await _client.post('/booking/create', {
       'issueId': issueId,
       'workerId': workerId,
       if (quotationId != null) 'quotationId': quotationId,
@@ -21,14 +21,14 @@ class BookingService {
 
   /// Get booking history
   Future<List<dynamic>> getHistory() async {
-    final response = await _client.get('/api/booking/history');
+    final response = await _client.get('/booking/history');
     return response.data as List<dynamic>;
   }
 
   /// Get live worker location for a booking
   Future<Map<String, dynamic>?> getLiveLocation(String bookingId) async {
     final response = await _client.get(
-      '/api/booking/live-location',
+      '/booking/live-location',
       queryParameters: {'bookingId': bookingId},
     );
     return response.data as Map<String, dynamic>?;
@@ -36,7 +36,7 @@ class BookingService {
 
   /// Complete a booking (worker calls this)
   Future<Map<String, dynamic>> completeBooking(String bookingId, {String? otp}) async {
-    final response = await _client.post('/api/booking/complete', {
+    final response = await _client.post('/booking/complete', {
       'bookingId': bookingId,
       if (otp != null) 'completionOtp': otp,
     });
@@ -50,7 +50,7 @@ class BookingService {
     required int rating,
     String? comment,
   }) async {
-    final response = await _client.post('/api/review/add', {
+    final response = await _client.post('/review/add', {
       'bookingId': bookingId,
       'workerId': workerId,
       'rating': rating,
@@ -66,7 +66,7 @@ class BookingService {
     double? longitude,
     String? category,
   }) async {
-    final response = await _client.get('/api/worker/nearby', queryParameters: {
+    final response = await _client.get('/worker/nearby', queryParameters: {
       if (issueId != null) 'issueId': issueId,
       if (latitude != null) 'latitude': latitude.toString(),
       if (longitude != null) 'longitude': longitude.toString(),
@@ -77,7 +77,7 @@ class BookingService {
 
   /// Get quotations for an issue
   Future<List<dynamic>> getQuotations(String issueId) async {
-    final response = await _client.get('/api/worker/quotations/$issueId');
+    final response = await _client.get('/worker/quotations/$issueId');
     return response.data as List<dynamic>;
   }
 }

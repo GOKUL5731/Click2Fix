@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
 
@@ -15,6 +17,17 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
   bool _notifications = true;
   bool _locationSharing = true;
   String _language = 'English';
+  String _appVersionLabel = '…';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) {
+        setState(() => _appVersionLabel = 'v${info.version} (+${info.buildNumber})');
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -41,7 +54,7 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
         _Section(title: 'About'),
         _ActionTile(icon: Icons.description, label: 'Terms of Service', onTap: () {}),
         _ActionTile(icon: Icons.privacy_tip, label: 'Privacy Policy', onTap: () {}),
-        _ActionTile(icon: Icons.info, label: 'App Version', trailing: 'v0.1.0', onTap: () {}),
+        _ActionTile(icon: Icons.info, label: 'App Version', trailing: _appVersionLabel, onTap: () {}),
         const SizedBox(height: 24),
         SizedBox(width: double.infinity, child: OutlinedButton.icon(
           onPressed: () { ref.read(sessionProvider.notifier).logout(); context.go('/login'); },

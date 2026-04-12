@@ -30,7 +30,7 @@ class PushNotificationService {
 
     try {
       apiClient.setToken(authToken);
-      await apiClient.post('/api/notifications/register-token', {
+      await apiClient.post('/notifications/register-token', {
         'fcmToken': token,
         'platform': _platformName,
         'appVariant': appVariant,
