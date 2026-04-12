@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../services/api_client.dart';
+import '../services/google_auth_service.dart';
 
 enum UserRole { user, worker, none }
 
@@ -45,6 +46,7 @@ class Session {
 }
 
 final apiClientProvider = Provider<ApiClient>((ref) => ApiClient());
+final googleAuthProvider = Provider((ref) => GoogleAuthService(ref.read(apiClientProvider)));
 
 class SessionNotifier extends StateNotifier<Session> {
   SessionNotifier(this._apiClient)

@@ -57,10 +57,20 @@ export const firebaseLoginSchema = z.object({
   deviceId: z.string().max(180).optional()
 });
 
+export const googleLoginSchema = z.object({
+  role: z.enum(['user', 'worker', 'admin']).default('user'),
+  email: z.string().email(),
+  name: z.string().min(2).max(120).optional(),
+  photoUrl: z.string().url().optional(),
+  firebaseUid: z.string().min(1),
+  deviceId: z.string().max(180).optional()
+});
+
 type RegisterInput = z.infer<typeof registerSchema>;
 type LoginInput = z.infer<typeof loginSchema>;
 type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 type FirebaseLoginInput = z.infer<typeof firebaseLoginSchema>;
+type GoogleLoginInput = z.infer<typeof googleLoginSchema>;
 
 // ── OTP helpers ──────────────────────────────────────────────────────
 
@@ -381,4 +391,71 @@ export async function firebaseLogin(input: FirebaseLoginInput) {
 
 export async function logout() {
   return { message: 'Logged out. Client should discard access and refresh tokens.' };
+}
+
+export async function googleLogin(input: GoogleLoginInput) {
+  if (input.role === 'admin') {
+    const result = await query<{ id: string; email: string; name: string }>(
+      'SELECT id, email, name FROM admin_users WHERE email = $1 AND is_active = TRUE',
+      [input.email]
+    );
+    let admin = result.rows[0];
+    if (!admin) {
+      const insertResult = await query<{ id: string; email: string; name: string }>(
+        `INSERT INTO admin_users (email, name, password_hash, is_active)
+         VALUES ($1, $2, $3, TRUE)
+         RETURNING id, email, name`,
+        [input.email, input.name ?? 'Admin User', 'google-sso']
+      );
+      admin = insertResult.rows[0];
+    }
+    const token = signToken({ sub: admin.id, role: 'admin', email: admin.email, deviceId: input.deviceId });
+    return { token, user: { id: admin.id, name: admin.name, email: admin.email, role: 'admin' } };
+  }
+
+  const phone = firebaseSyntheticPhone(input.firebaseUid);
+
+  if (input.role === 'worker') {
+    const result = await query<{ id: string; name: string; email: string }>(
+      `INSERT INTO workers (name, phone, category, experience)
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (phone) DO UPDATE
+       SET name = COALESCE(EXCLUDED.name, workers.name)
+       RETURNING id, name`,
+      [input.name ?? 'Worker', phone, null, 0]
+    );
+
+    const account = result.rows[0];
+    const token = signToken({
+      sub: account.id,
+      role: 'worker',
+      phone: phone,
+      deviceId: input.deviceId,
+      firebaseUid: input.firebaseUid
+    });
+    return { token, user: { id: account.id, name: account.name, email: input.email, role: 'worker' } };
+  }
+
+  const userResult = await query<{ id: string; name: string; email: string }>(
+    `INSERT INTO users (name, phone, email, profile_photo)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (phone) DO UPDATE
+     SET name = COALESCE(EXCLUDED.name, users.name),
+         email = COALESCE(EXCLUDED.email, users.email),
+         profile_photo = COALESCE(EXCLUDED.profile_photo, users.profile_photo)
+     RETURNING id, name, email`,
+    [input.name ?? null, phone, input.email, input.photoUrl ?? null]
+  );
+
+  const user = userResult.rows[0];
+  const token = signToken({
+    sub: user.id,
+    role: 'user',
+    phone: phone,
+    email: user.email,
+    deviceId: input.deviceId,
+    firebaseUid: input.firebaseUid
+  });
+
+  return { token, user: { id: user.id, name: user.name, email: user.email, role: 'customer' } };
 }

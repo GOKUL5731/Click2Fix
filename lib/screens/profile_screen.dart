@@ -30,9 +30,12 @@ class ProfileScreen extends ConsumerWidget {
           _MenuTile(icon: Icons.settings, label: 'Settings', onTap: () => context.go('/settings')),
           _MenuTile(icon: Icons.help_outline, label: 'Help & Support', onTap: () {}),
           const SizedBox(height: 16),
-          _MenuTile(icon: Icons.logout, label: 'Logout', color: AppColors.emergencyRed, onTap: () {
-            ref.read(sessionProvider.notifier).logout();
-            context.go('/login');
+          _MenuTile(icon: Icons.logout, label: 'Logout', color: AppColors.emergencyRed, onTap: () async {
+            await ref.read(googleAuthProvider).signOut();
+            await ref.read(sessionProvider.notifier).logout();
+            if (context.mounted) {
+              context.go('/login');
+            }
           }),
         ])),
       ])),

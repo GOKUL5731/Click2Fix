@@ -9,7 +9,8 @@ import '../providers/session_provider.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_identity_sync.dart';
-import '../widgets/primary_action_button.dart';
+import '../widgets/app_button.dart';
+import '../widgets/app_text_field.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -23,13 +24,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
 
   bool _isWorker = false;
   bool _isLoading = false;
   String? _selectedCategory;
   bool _obscurePassword = true;
-  bool _obscureConfirm = true;
 
   final _categories = [
     'Plumbing',
@@ -47,113 +46,62 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     _phoneController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  Future<void> _registerWithEmailPassword() async {
-    if (Firebase.apps.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Firebase is not configured. Add google-services.json and rebuild.')),
-      );
-      return;
-    }
-    final name = _nameController.text.trim();
-    final email = _emailController.text.trim();
-    final pass = _passwordController.text;
-    final confirm = _confirmPasswordController.text;
-
-    if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your name')),
-      );
-      return;
-    }
-    if (!email.contains('@')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid email')),
-      );
-      return;
-    }
-    if (pass.length < 8) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Password must be at least 8 characters')),
-      );
-      return;
-    }
-    if (pass != confirm) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Passwords do not match')),
-      );
-      return;
-    }
-    if (_isWorker && _selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your service category')),
-      );
-      return;
-    }
-
-    final router = GoRouter.of(context);
-    final messenger = ScaffoldMessenger.of(context);
-    setState(() => _isLoading = true);
-    try {
-      await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: pass,
-      );
-      final user = FirebaseAuth.instance.currentUser;
-      if (user != null) {
-        await user.updateDisplayName(name);
-        await user.reload();
-      }
-      if (!mounted) return;
-      final digits =
-          _phoneController.text.trim().replaceFirst(RegExp(r'^\+?91'), '').replaceAll(RegExp(r'\D'), '');
-      await FirebaseIdentitySync.exchangeIdTokenForBackendJwt(
-        ref: ref,
-        role: _isWorker ? UserRole.worker : UserRole.user,
-        explicitPhone: digits.length >= 10 ? digits : null,
-        explicitName: name,
-        category: _isWorker ? _selectedCategory?.toLowerCase().replaceAll(' ', '_') : null,
-      );
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      router.go(_isWorker ? '/worker/dashboard' : '/home');
-    } on FirebaseAuthException catch (e) {
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      messenger.showSnackBar(SnackBar(content: Text(e.message ?? 'Registration failed')));
-    } catch (e) {
-      await FirebaseAuth.instance.signOut();
-      if (!mounted) return;
-      setState(() => _isLoading = false);
-      final message = e is ApiException ? e.message : 'Could not complete registration. Try again.';
-      messenger.showSnackBar(SnackBar(content: Text(message)));
-    }
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: AppColors.error,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _register() async {
     final name = _nameController.text.trim();
     final phone = _phoneController.text.trim();
+    final digits = phone.replaceFirst(RegExp(r'^\+?91'), '').replaceAll(RegExp(r'\D'), '');
+    final email = _emailController.text.trim();
+    final pass = _passwordController.text;
 
-    final digits =
-        phone.replaceFirst(RegExp(r'^\+?91'), '').replaceAll(RegExp(r'\D'), '');
     if (name.isEmpty || digits.length < 10) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter your name and a valid 10-digit phone number')),
-      );
+      _showError('Please enter your name and a valid 10-digit phone number');
       return;
     }
-
     if (_isWorker && _selectedCategory == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please select your service category')),
-      );
+      _showError('Please select your service category');
       return;
     }
 
     setState(() => _isLoading = true);
+    
+    // Fallback if password is provided, try Firebase Auth directly
+    if (email.contains('@') && pass.length >= 6 && Firebase.apps.isNotEmpty) {
+      try {
+        await FirebaseAuth.instance.createUserWithEmailAndPassword(email: email, password: pass);
+        await FirebaseAuth.instance.currentUser?.updateDisplayName(name);
+        await FirebaseIdentitySync.exchangeIdTokenForBackendJwt(
+          ref: ref,
+          role: _isWorker ? UserRole.worker : UserRole.user,
+          explicitPhone: digits,
+          explicitName: name,
+          category: _isWorker ? _selectedCategory?.toLowerCase().replaceAll(' ', '_') : null,
+        );
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        context.go(_isWorker ? '/worker/dashboard' : '/home');
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        _showError(e is FirebaseAuthException ? (e.message ?? 'Registration failed') : 'Registration failed');
+        return;
+      }
+    }
+
+    // Default API auth
     try {
       final client = ref.read(apiClientProvider);
       final authService = AuthService(client);
@@ -161,60 +109,91 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
         role: _isWorker ? 'worker' : 'user',
         phone: digits,
         name: name,
-        email: _emailController.text.trim().isNotEmpty ? _emailController.text.trim() : null,
-        category: _selectedCategory?.toLowerCase().replaceAll(' ', '_'),
+        email: email.isNotEmpty ? email : null,
+        category: _isWorker ? _selectedCategory?.toLowerCase().replaceAll(' ', '_') : null,
       );
 
-      if (mounted) {
-        setState(() => _isLoading = false);
-        context.go('/otp', extra: {'phone': digits, 'isWorker': _isWorker});
-      }
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      context.go('/otp', extra: {'phone': digits, 'isWorker': _isWorker});
     } catch (e) {
-      if (mounted) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showError(e is ApiException ? e.message : 'Registration failed. Check connection.');
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    final router = GoRouter.of(context);
+    setState(() => _isLoading = true);
+    
+    try {
+      final googleAuthService = ref.read(googleAuthProvider);
+      final credential = await googleAuthService.signInWithGoogle();
+      
+      if (credential == null || credential.user == null) {
         setState(() => _isLoading = false);
-        final message = e is ApiException
-            ? e.message
-            : 'Registration failed. Check your connection and try again.';
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+        return;
       }
+
+      final roleStr = _isWorker ? 'worker' : 'user';
+      final response = await googleAuthService.loginWithBackend(
+        firebaseUser: credential.user!,
+        role: roleStr,
+      );
+
+      if (!mounted) return;
+      
+      ref.read(sessionProvider.notifier).login(
+        token: response['token'],
+        role: _isWorker ? UserRole.worker : UserRole.user,
+        name: credential.user!.displayName ?? response['user']?['name'],
+        phone: credential.user!.phoneNumber ?? response['user']?['phone'],
+      );
+
+      setState(() => _isLoading = false);
+      router.go(_isWorker ? '/worker/dashboard' : '/home');
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      _showError(e is ApiException ? e.message : 'Google sign-in failed: \${e.toString()}');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
+        title: const Text('Create Account'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          icon: const Icon(Icons.arrow_back),
           onPressed: () => context.go('/login'),
         ),
-        title: const Text('Create Account'),
       ),
       body: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(24.0),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // Role toggle
             Container(
               decoration: BoxDecoration(
-                color: AppColors.backgroundLight,
-                borderRadius: BorderRadius.circular(14),
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.divider),
               ),
               child: Row(
                 children: [
                   Expanded(
                     child: _RoleTab(
-                      label: 'I need repairs',
-                      icon: Icons.home_repair_service,
+                      label: 'Customer',
                       isActive: !_isWorker,
                       onTap: () => setState(() => _isWorker = false),
                     ),
                   ),
                   Expanded(
                     child: _RoleTab(
-                      label: 'I\'m a worker',
-                      icon: Icons.engineering,
+                      label: 'Worker',
                       isActive: _isWorker,
                       onTap: () => setState(() => _isWorker = true),
                     ),
@@ -223,146 +202,116 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
               ),
             ),
             const SizedBox(height: 24),
-
-            TextField(
+            AppTextField(
+              label: 'Full Name',
+              hint: 'John Doe',
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Full Name',
-                prefixIcon: Icon(Icons.person_outline),
-              ),
+              prefixIcon: const Icon(Icons.person_outline),
             ),
             const SizedBox(height: 16),
-
-            TextField(
+            AppTextField(
+              label: 'Mobile Number',
+              hint: 'Enter your 10-digit number',
               controller: _phoneController,
               keyboardType: TextInputType.phone,
-              decoration: InputDecoration(
-                labelText: 'Mobile Number',
-                prefixIcon: const Padding(
-                  padding: EdgeInsets.only(left: 16, right: 8),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text('🇮🇳', style: TextStyle(fontSize: 20)),
-                      SizedBox(width: 6),
-                      Text('+91', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                    ],
-                  ),
-                ),
-                prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+              prefixIcon: const Padding(
+                padding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+                child: Text('+91', style: TextStyle(fontWeight: FontWeight.bold)),
               ),
             ),
             const SizedBox(height: 16),
-
-            TextField(
+            AppTextField(
+              label: 'Email (Optional)',
+              hint: 'you@example.com',
               controller: _emailController,
               keyboardType: TextInputType.emailAddress,
-              autocorrect: false,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                hintText: 'Required for email & password signup',
-                prefixIcon: Icon(Icons.email_outlined),
-              ),
+              prefixIcon: const Icon(Icons.email_outlined),
             ),
             const SizedBox(height: 16),
-
-            // Worker-specific fields
+            AppTextField(
+              label: 'Password (Optional)',
+              hint: 'Set an account password',
+              controller: _passwordController,
+              obscureText: _obscurePassword,
+              prefixIcon: const Icon(Icons.lock_outline),
+              suffixIcon: IconButton(
+                icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+              ),
+            ),
+            
             if (_isWorker) ...[
+              const SizedBox(height: 16),
+              const Text(
+                'Service Category',
+                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(height: 8),
               DropdownButtonFormField<String>(
-                initialValue: _selectedCategory,
-                decoration: const InputDecoration(
-                  labelText: 'Service Category',
-                  prefixIcon: Icon(Icons.build_circle_outlined),
+                value: _selectedCategory,
+                decoration: InputDecoration(
+                  filled: true,
+                  fillColor: Colors.white,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.divider),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: const BorderSide(color: AppColors.divider),
+                  ),
                 ),
                 hint: const Text('Select category'),
                 items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                 onChanged: (val) => setState(() => _selectedCategory = val),
               ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.trustGold.withAlpha(15),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.trustGold.withAlpha(40)),
-                ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, size: 18, color: AppColors.trustGold),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        'After registration, you\'ll need to upload identity documents (Aadhaar, certificates). Your profile will be reviewed by our admin team before activation.',
-                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
             ],
-
-            const SizedBox(height: 8),
-            PrimaryActionButton(
-              label: 'Register & Send OTP',
-              icon: Icons.app_registration,
-              isLoading: _isLoading,
+            
+            const SizedBox(height: 32),
+            AppButton(
+              text: 'Register',
               onPressed: _register,
-            ),
-            const SizedBox(height: 28),
-            Row(
-              children: [
-                const Expanded(child: Divider()),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  child: Text(
-                    'Or sign up with email',
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textHint),
-                  ),
-                ),
-                const Expanded(child: Divider()),
-              ],
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: _passwordController,
-              obscureText: _obscurePassword,
-              decoration: InputDecoration(
-                labelText: 'Password',
-                hintText: 'At least 8 characters',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(_obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                  onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _confirmPasswordController,
-              obscureText: _obscureConfirm,
-              decoration: InputDecoration(
-                labelText: 'Confirm password',
-                prefixIcon: const Icon(Icons.lock_outline),
-                suffixIcon: IconButton(
-                  icon: Icon(_obscureConfirm ? Icons.visibility_outlined : Icons.visibility_off_outlined),
-                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            PrimaryActionButton(
-              label: 'Create account with email',
-              icon: Icons.person_add_alt_1,
               isLoading: _isLoading,
-              onPressed: _registerWithEmailPassword,
             ),
-            const SizedBox(height: 16),
-            Center(
-              child: TextButton(
-                onPressed: () => context.go('/login'),
-                child: const Text('Already have an account? Login'),
+            
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoading ? null : _signInWithGoogle,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black87,
+                  elevation: 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(color: AppColors.divider.withOpacity(0.5)),
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                icon: _isLoading 
+                  ? const SizedBox(
+                      width: 24, height: 24,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ) 
+                  : const Icon(Icons.g_mobiledata, size: 28, color: Colors.blue),
+                label: const Text(
+                  'Continue with Google',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                ),
               ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text('Already have an account?', style: TextStyle(color: AppColors.textLight)),
+                TextButton(
+                  onPressed: () => context.go('/login'),
+                  child: const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
             ),
           ],
         ),
@@ -372,9 +321,13 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 }
 
 class _RoleTab extends StatelessWidget {
-  const _RoleTab({required this.label, required this.icon, required this.isActive, required this.onTap});
+  const _RoleTab({
+    required this.label,
+    required this.isActive,
+    required this.onTap,
+  });
+
   final String label;
-  final IconData icon;
   final bool isActive;
   final VoidCallback onTap;
 
@@ -382,25 +335,20 @@ class _RoleTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.primaryBlue : Colors.transparent,
-          borderRadius: BorderRadius.circular(14),
+          color: isActive ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, size: 18, color: isActive ? Colors.white : AppColors.textSecondary),
-            const SizedBox(width: 8),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: FontWeight.w600,
-                  color: isActive ? Colors.white : AppColors.textSecondary,
-                )),
-          ],
+        child: Text(
+          label,
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+            color: isActive ? Colors.white : AppColors.textLight,
+          ),
         ),
       ),
     );

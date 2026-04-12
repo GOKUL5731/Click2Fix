@@ -22,22 +22,35 @@ class _WorkerComparisonState extends State<WorkerComparisonScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        leading: IconButton(icon: const Icon(Icons.arrow_back_ios_new, size: 20), onPressed: () => context.go('/ai-result')),
-        title: const Text('Nearby Workers'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_ios_new, size: 20),
+          onPressed: () => context.go('/ai-result'),
+        ),
+        title: const Text('Nearby Workers', style: TextStyle(fontWeight: FontWeight.bold)),
+        elevation: 0,
+        backgroundColor: AppColors.background,
+        iconTheme: const IconThemeData(color: AppColors.textDark),
         actions: [
           Container(
-            margin: const EdgeInsets.only(right: 12),
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            margin: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.successGreen.withAlpha(20),
+              color: AppColors.success.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
-            child: Row(mainAxisSize: MainAxisSize.min, children: [
-              const Icon(Icons.people, size: 14, color: AppColors.successGreen),
-              const SizedBox(width: 4),
-              Text('${_workers.length} found', style: const TextStyle(fontSize: 12, color: AppColors.successGreen, fontWeight: FontWeight.w600)),
-            ]),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.people, size: 14, color: AppColors.success),
+                const SizedBox(width: 4),
+                Text(
+                  '${_workers.length} found',
+                  style: const TextStyle(fontSize: 12, color: AppColors.success, fontWeight: FontWeight.bold),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -47,26 +60,35 @@ class _WorkerComparisonState extends State<WorkerComparisonScreen> {
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(children: [
-              _SortChip(label: 'Best Rating', isActive: _sortBy == 'rating', onTap: () => setState(() => _sortBy = 'rating')),
-              const SizedBox(width: 8),
-              _SortChip(label: 'Lowest Price', isActive: _sortBy == 'price', onTap: () => setState(() => _sortBy = 'price')),
-              const SizedBox(width: 8),
-              _SortChip(label: 'Nearest', isActive: _sortBy == 'distance', onTap: () => setState(() => _sortBy = 'distance')),
-              const SizedBox(width: 8),
-              _SortChip(label: 'Fastest', isActive: _sortBy == 'fastest', onTap: () => setState(() => _sortBy = 'fastest')),
-            ]),
+            child: Row(
+              children: [
+                _SortChip(label: 'Best Rating', isActive: _sortBy == 'rating', onTap: () => setState(() => _sortBy = 'rating')),
+                const SizedBox(width: 8),
+                _SortChip(label: 'Lowest Price', isActive: _sortBy == 'price', onTap: () => setState(() => _sortBy = 'price')),
+                const SizedBox(width: 8),
+                _SortChip(label: 'Nearest', isActive: _sortBy == 'distance', onTap: () => setState(() => _sortBy = 'distance')),
+                const SizedBox(width: 8),
+                _SortChip(label: 'Fastest', isActive: _sortBy == 'fastest', onTap: () => setState(() => _sortBy = 'fastest')),
+              ],
+            ),
           ),
+          const SizedBox(height: 8),
           // Worker list
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
+            child: ListView.separated(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               itemCount: _workers.length,
+              separatorBuilder: (context, index) => const SizedBox(height: 16),
               itemBuilder: (context, index) {
                 final w = _workers[index];
                 return WorkerCard(
-                  name: w.name, category: w.category, rating: w.rating, trustScore: w.trust,
-                  price: w.price, distance: w.distance, eta: w.eta,
+                  name: w.name,
+                  category: w.category,
+                  rating: w.rating,
+                  trustScore: w.trust,
+                  price: w.price,
+                  distance: w.distance,
+                  eta: w.eta,
                   onTap: () => context.go('/worker-detail'),
                   onBook: () => context.go('/booking-confirmation'),
                 );
@@ -81,18 +103,31 @@ class _WorkerComparisonState extends State<WorkerComparisonScreen> {
 
 class _SortChip extends StatelessWidget {
   const _SortChip({required this.label, required this.isActive, required this.onTap});
-  final String label; final bool isActive; final VoidCallback onTap;
+  final String label;
+  final bool isActive;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) => GestureDetector(
-    onTap: onTap,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(
-        color: isActive ? AppColors.primaryBlue : Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: isActive ? AppColors.primaryBlue : AppColors.divider),
-      ),
-      child: Text(label, style: TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: isActive ? Colors.white : AppColors.textSecondary)),
-    ),
-  );
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: isActive ? AppColors.primary : Colors.white,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: isActive ? AppColors.primary : AppColors.divider),
+            boxShadow: isActive
+                ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+                : [],
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: isActive ? Colors.white : AppColors.textLight,
+            ),
+          ),
+        ),
+      );
 }

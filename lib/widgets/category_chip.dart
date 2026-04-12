@@ -17,42 +17,38 @@ class CategoryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = Theme.of(context).brightness == Brightness.dark;
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryBlue
-              : isDark
-                  ? AppColors.cardDark
-                  : Colors.white,
-          borderRadius: BorderRadius.circular(14),
+          color: isSelected ? AppColors.primary : Colors.white,
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
-            color: isSelected ? AppColors.primaryBlue : (isDark ? Colors.white10 : AppColors.divider),
+            color: isSelected ? AppColors.primary : AppColors.divider,
             width: isSelected ? 2 : 1,
           ),
           boxShadow: isSelected
-              ? [BoxShadow(color: AppColors.primaryBlue.withAlpha(40), blurRadius: 12, offset: const Offset(0, 4))]
-              : [],
+              ? [BoxShadow(color: AppColors.primary.withOpacity(0.3), blurRadius: 8, offset: const Offset(0, 4))]
+              : [BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 4, offset: const Offset(0, 2))],
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               icon,
               size: 28,
-              color: isSelected ? Colors.white : AppColors.primaryBlue,
+              color: isSelected ? Colors.white : AppColors.primary,
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
-                fontSize: 11,
+                fontSize: 12,
                 fontWeight: FontWeight.w600,
-                color: isSelected ? Colors.white : (isDark ? Colors.white70 : AppColors.textPrimary),
+                color: isSelected ? Colors.white : AppColors.textDark,
               ),
               textAlign: TextAlign.center,
             ),
@@ -71,7 +67,7 @@ class ServiceCategories {
     (label: 'Cleaning', icon: Icons.cleaning_services, key: 'cleaning'),
     (label: 'Painting', icon: Icons.format_paint, key: 'painting'),
     (label: 'Appliance', icon: Icons.kitchen, key: 'appliance_repair'),
-    (label: 'Gas', icon: Icons.local_fire_department, key: 'gas_leakage'),
+    (label: 'AC Repair', icon: Icons.ac_unit, key: 'ac_repair'),
     (label: 'General', icon: Icons.build, key: 'general'),
   ];
 }

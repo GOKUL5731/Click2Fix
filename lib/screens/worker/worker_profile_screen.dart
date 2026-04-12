@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../config/app_theme.dart';
 import '../../providers/session_provider.dart';
 import '../../widgets/star_rating.dart';
+import '../../services/google_auth_service.dart';
 
 class WorkerProfileScreen extends ConsumerWidget {
   const WorkerProfileScreen({super.key});
@@ -44,7 +45,11 @@ class WorkerProfileScreen extends ConsumerWidget {
         _InfoTile(icon: Icons.location_on, label: 'Service Area', value: 'Chennai — 10 km radius', isDark: isDark),
         const SizedBox(height: 20),
         SizedBox(width: double.infinity, child: OutlinedButton.icon(
-          onPressed: () { ref.read(sessionProvider.notifier).logout(); context.go('/login'); },
+          onPressed: () async { 
+            await ref.read(googleAuthProvider).signOut();
+            await ref.read(sessionProvider.notifier).logout(); 
+            if (context.mounted) context.go('/login'); 
+          },
           icon: const Icon(Icons.logout, color: AppColors.emergencyRed),
           label: const Text('Logout', style: TextStyle(color: AppColors.emergencyRed)),
           style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.emergencyRed), padding: const EdgeInsets.all(14)),

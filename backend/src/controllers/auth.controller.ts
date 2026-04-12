@@ -29,3 +29,7 @@ export const verifyUploadOtp = asyncHandler(async (req: Request, res: Response) 
 export const logout = asyncHandler(async (_req: Request, res: Response) => {
   res.json(await authService.logout());
 });
+
+export const googleLogin = asyncHandler(async (req: Request, res: Response) => {
+  res.json(await authService.googleLogin(req.body));
+});

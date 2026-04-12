@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
+import '../services/google_auth_service.dart';
 
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
@@ -57,7 +58,11 @@ class _SettingsState extends ConsumerState<SettingsScreen> {
         _ActionTile(icon: Icons.info, label: 'App Version', trailing: _appVersionLabel, onTap: () {}),
         const SizedBox(height: 24),
         SizedBox(width: double.infinity, child: OutlinedButton.icon(
-          onPressed: () { ref.read(sessionProvider.notifier).logout(); context.go('/login'); },
+          onPressed: () async { 
+            await ref.read(googleAuthProvider).signOut();
+            await ref.read(sessionProvider.notifier).logout(); 
+            if (context.mounted) context.go('/login'); 
+          },
           icon: const Icon(Icons.logout, color: AppColors.emergencyRed),
           label: const Text('Logout', style: TextStyle(color: AppColors.emergencyRed)),
           style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.emergencyRed), padding: const EdgeInsets.all(14)),

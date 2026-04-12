@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
-import '../widgets/primary_action_button.dart';
+import '../widgets/app_button.dart';
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({super.key});
@@ -20,19 +20,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       title: 'Click',
       subtitle: 'Snap a photo of your household problem — leaking pipe, broken fan, wall crack. Our AI instantly detects the issue.',
       icon: Icons.camera_alt_rounded,
-      color: AppColors.primaryBlue,
+      color: AppColors.primary,
     ),
     (
       title: 'Compare',
       subtitle: 'Get matched with verified nearby workers. Compare by price, rating, distance, arrival time, and trust score.',
       icon: Icons.compare_arrows_rounded,
-      color: AppColors.trustGold,
+      color: AppColors.accent,
     ),
     (
       title: 'Fix',
       subtitle: 'Book instantly, track live, chat with worker, pay securely, and rate the service. That simple!',
-      icon: Icons.check_circle_rounded,
-      color: AppColors.successGreen,
+      icon: Icons.success,
+      color: AppColors.success,
     ),
   ];
 
@@ -45,6 +45,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
           children: [
@@ -53,7 +54,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               alignment: Alignment.topRight,
               child: TextButton(
                 onPressed: () => context.go('/login'),
-                child: const Text('Skip'),
+                child: const Text('Skip', style: TextStyle(color: AppColors.textLight, fontWeight: FontWeight.bold)),
               ),
             ),
             // Pages
@@ -75,23 +76,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           height: 140,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
-                            color: page.color.withAlpha(20),
+                            color: page.color.withOpacity(0.1),
                           ),
                           child: Icon(page.icon, size: 64, color: page.color),
                         ).animate().scale(duration: 500.ms, curve: Curves.elasticOut),
                         const SizedBox(height: 40),
                         Text(
                           page.title,
-                          style: Theme.of(context).textTheme.displaySmall?.copyWith(fontWeight: FontWeight.w800),
+                          style: const TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textDark),
                           textAlign: TextAlign.center,
                         ).animate().fadeIn(delay: 200.ms),
                         const SizedBox(height: 16),
                         Text(
                           page.subtitle,
-                          style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                color: AppColors.textSecondary,
-                                height: 1.6,
-                              ),
+                          style: const TextStyle(fontSize: 16, color: AppColors.textLight, height: 1.6),
                           textAlign: TextAlign.center,
                         ).animate().fadeIn(delay: 400.ms),
                       ],
@@ -113,7 +111,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     width: _currentPage == index ? 28 : 8,
                     height: 8,
                     decoration: BoxDecoration(
-                      color: _currentPage == index ? AppColors.primaryBlue : AppColors.divider,
+                      color: _currentPage == index ? AppColors.primary : AppColors.divider,
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -123,19 +121,22 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             // Button
             Padding(
               padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-              child: PrimaryActionButton(
-                label: _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
-                icon: _currentPage == _pages.length - 1 ? Icons.arrow_forward : null,
-                onPressed: () {
-                  if (_currentPage < _pages.length - 1) {
-                    _controller.nextPage(
-                      duration: const Duration(milliseconds: 400),
-                      curve: Curves.easeInOut,
-                    );
-                  } else {
-                    context.go('/login');
-                  }
-                },
+              child: SizedBox(
+                width: double.infinity,
+                child: AppButton(
+                  text: _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
+                  icon: _currentPage == _pages.length - 1 ? const Icon(Icons.arrow_forward, color: Colors.white) : null,
+                  onPressed: () {
+                    if (_currentPage < _pages.length - 1) {
+                      _controller.nextPage(
+                        duration: const Duration(milliseconds: 400),
+                        curve: Curves.easeInOut,
+                      );
+                    } else {
+                      context.go('/login');
+                    }
+                  },
+                ),
               ),
             ),
           ],
