@@ -45,6 +45,15 @@ export function createApp() {
     }
   });
 
+  // Root GET for health and info
+  app.get('/', (_req, res) => {
+    res.json({
+      status: 'ok',
+      message: 'Click2Fix backend is running',
+      api: 'https://click2fix-backend.onrender.com/api',
+    });
+  });
+
   // All API routes under /api — single clean mount (no double registration)
   app.use('/api', routes);
 
