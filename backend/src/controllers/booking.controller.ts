@@ -23,6 +23,14 @@ export const liveLocation = asyncHandler(async (req: Request, res: Response) => 
 });
 
 export const complete = asyncHandler(async (req: Request, res: Response) => {
-  res.json(await bookingService.completeBooking(req.body));
+  if (!req.auth?.sub || !req.auth.role) {
+    throw httpError(401, 'Authentication required');
+  }
+  res.json(
+    await bookingService.completeBooking(req.body, {
+      sub: req.auth.sub,
+      role: req.auth.role
+    })
+  );
 });
 

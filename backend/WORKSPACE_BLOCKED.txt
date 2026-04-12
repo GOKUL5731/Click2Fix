@@ -1,0 +1,1 @@
+Backend workspace blocked: repository files were not available to the tool session, so targeted stabilization work could not be performed safely.

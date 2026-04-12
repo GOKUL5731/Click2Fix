@@ -1,9 +1,15 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
+
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
+import '../services/device_token_sync.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -28,6 +34,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     if (!mounted) return;
 
+    if (session != null && session.isLoggedIn) {
+      final client = ref.read(apiClientProvider);
+      client.setToken(session.token);
+      await syncFcmDeviceToken(client);
+    }
+
+    if (!mounted) return;
+
     // 2. Check for in-app updates (non-blocking)
     await _checkForUpdate();
 
@@ -47,26 +61,92 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
   Future<void> _checkForUpdate() async {
     try {
-      const currentVersion = '0.1.0';
+      final info = await PackageInfo.fromPlatform();
+      final currentVersion = info.version;
+
+      String? rcLatest;
+      String? rcUrl;
+      var rcForce = false;
+      if (Firebase.apps.isNotEmpty) {
+        try {
+          final rc = FirebaseRemoteConfig.instance;
+          await rc.setConfigSettings(
+            RemoteConfigSettings(
+              fetchTimeout: const Duration(seconds: 12),
+              minimumFetchInterval: const Duration(hours: 1),
+            ),
+          );
+          await rc.setDefaults({
+            'latest_app_version': currentVersion,
+            'app_update_url': '',
+            'force_update': false,
+          });
+          await rc.fetchAndActivate();
+          rcLatest = rc.getString('latest_app_version');
+          rcUrl = rc.getString('app_update_url');
+          rcForce = rc.getBool('force_update');
+        } catch (e) {
+          debugPrint('Remote Config fetch skipped: $e');
+        }
+      }
+
       final client = ref.read(apiClientProvider);
-      final response = await client.get('/api/app/version');
-      final data = response.data as Map<String, dynamic>;
-      final latestVersion = data['latestVersion'] as String? ?? currentVersion;
-      final forceUpdate = data['forceUpdate'] as bool? ?? false;
-      final updateUrl = data['updateUrl'] as String? ?? '';
+      Map<String, dynamic> data;
+      try {
+        final response = await client.get('/api/app/version');
+        data = Map<String, dynamic>.from(response.data as Map);
+      } catch (_) {
+        final response = await client.get('/api/app/');
+        data = Map<String, dynamic>.from(response.data as Map);
+      }
 
       if (!mounted) return;
 
-      if (latestVersion != currentVersion && updateUrl.isNotEmpty) {
+      var latestVersion = data['latestVersion'] as String? ?? currentVersion;
+      var updateUrl = (data['updateUrl'] as String?)?.trim() ?? '';
+      var forceUpdate = data['forceUpdate'] as bool? ?? false;
+
+      if (rcLatest != null && rcLatest.isNotEmpty && _compareSemver(rcLatest, latestVersion) > 0) {
+        latestVersion = rcLatest;
+      }
+      if (rcUrl != null && rcUrl.trim().isNotEmpty) {
+        updateUrl = rcUrl.trim();
+      }
+      forceUpdate = forceUpdate || rcForce;
+
+      final needsUpdate =
+          updateUrl.isNotEmpty && _compareSemver(latestVersion, currentVersion) > 0;
+
+      if (needsUpdate) {
         await _showUpdateDialog(
           latestVersion: latestVersion,
           updateUrl: updateUrl,
           forceUpdate: forceUpdate,
         );
       }
-    } catch (_) {
-      // Version check failure is non-critical â€” ignore silently
+    } catch (e) {
+      debugPrint('Version check skipped: $e');
     }
+  }
+
+  /// Lexical semver-style compare (major.minor.patch+).
+  int _compareSemver(String a, String b) {
+    List<int> parts(String v) {
+      final core = v.split('+').first.split('-').first;
+      return core
+          .split('.')
+          .map((s) => int.tryParse(s.replaceAll(RegExp(r'[^0-9]'), '')) ?? 0)
+          .toList();
+    }
+
+    final pa = parts(a);
+    final pb = parts(b);
+    for (var i = 0; i < 4; i++) {
+      final va = i < pa.length ? pa[i] : 0;
+      final vb = i < pb.length ? pb[i] : 0;
+      if (va != vb) return va.compareTo(vb);
+    }
+    return 0;
   }
 
   Future<void> _showUpdateDialog({
@@ -80,7 +160,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       barrierDismissible: !forceUpdate,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Update Available ðŸš€'),
+        title: const Text('Update available'),
         content: Text(
           'A new version ($latestVersion) of Click2Fix is available with bug fixes and improvements.',
         ),
@@ -91,12 +171,14 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               child: const Text('Later'),
             ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(ctx).pop();
-              // TODO: Open updateUrl using url_launcher or webview
-              debugPrint('Update URL: $updateUrl');
+              final uri = Uri.tryParse(updateUrl);
+              if (uri != null && await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              }
             },
-            child: const Text('Update Now'),
+            child: const Text('Update now'),
           ),
         ],
       ),

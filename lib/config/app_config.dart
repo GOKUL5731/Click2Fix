@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 class AppConfig {
   static const appName = 'Click2Fix';
   static const tagline = 'Click the problem. Fix it instantly.';
@@ -7,15 +9,19 @@ class AppConfig {
     defaultValue: 'development',
   );
 
-  static const apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'https://click2fix-backend.onrender.com',
-  );
+  static const _configuredApiBase = String.fromEnvironment('API_BASE_URL');
+  static const _configuredSocket = String.fromEnvironment('SOCKET_URL');
 
-  static const socketUrl = String.fromEnvironment(
-    'SOCKET_URL',
-    defaultValue: 'https://click2fix-backend.onrender.com',
-  );
+  /// Production Render URL (HTTPS). Override with `--dart-define=API_BASE_URL=...` if your service URL changes.
+  static const _defaultBackendHost = 'https://click2fix-backend.onrender.com';
+
+  static String get apiBaseUrl => _normalizeBaseUrl(
+        _configuredApiBase.trim().isEmpty ? _defaultBackendHost : _configuredApiBase,
+      );
+
+  static String get socketUrl => _normalizeBaseUrl(
+        _configuredSocket.trim().isEmpty ? _defaultBackendHost : _configuredSocket,
+      );
 
   static const googleMapsApiKey = String.fromEnvironment(
     'GOOGLE_MAPS_API_KEY',
@@ -41,4 +47,21 @@ class AppConfig {
     'FIREBASE_WEB_PROJECT_ID',
     defaultValue: '',
   );
+
+  static String _normalizeBaseUrl(String value) {
+    var normalized = value.trim();
+    if (normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    if (!normalized.startsWith('http://') && !normalized.startsWith('https://')) {
+      normalized = 'https://$normalized';
+    }
+    if (!kIsWeb && normalized.startsWith('http://')) {
+      final host = normalized.replaceFirst('http://', '');
+      if (!host.startsWith('127.0.0.1') && !host.startsWith('localhost')) {
+        normalized = 'https://$host';
+      }
+    }
+    return normalized;
+  }
 }

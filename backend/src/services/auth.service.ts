@@ -16,7 +16,7 @@ export const registerSchema = z.object({
   role: z.enum(['user', 'worker']).default('user'),
   name: z.string().min(2).max(120).optional(),
   phone: z.string().min(8).max(20),
-  email: z.string().email().optional(),
+  email: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : val), z.string().email().optional()),
   password: z.string().min(8).optional(),
   category: z.string().max(80).optional(),
   experience: z.number().int().min(0).max(60).optional(),
@@ -311,12 +311,24 @@ export async function verifyUploadOtp(phone: string, otp: string) {
 
 // ── Firebase login ──────────────────────────────────────────────────
 
+/** Stable 20-char "phone" for DB unique constraint when user signs in with email/Google only. */
+function firebaseSyntheticPhone(uid: string): string {
+  const compact = uid.replace(/-/g, '');
+  return ('f' + compact).slice(0, 20);
+}
+
 export async function firebaseLogin(input: FirebaseLoginInput) {
   const identity = await verifyFirebaseIdToken(input.idToken);
-  const phone = input.phone ?? identity.phone;
-
+  let phone = (input.phone ?? identity.phone)?.trim();
   if (!phone) {
-    throw httpError(400, 'Firebase login requires a phone number.');
+    if (identity.email) {
+      phone = firebaseSyntheticPhone(identity.uid);
+    } else {
+      throw httpError(
+        400,
+        'Firebase account must include a verified email or phone number.'
+      );
+    }
   }
 
   if (input.role === 'worker') {

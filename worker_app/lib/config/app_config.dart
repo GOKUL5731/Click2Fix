@@ -1,43 +1,28 @@
+import 'package:flutter/foundation.dart';
+
 class AppConfig {
-  static const appName = 'Click2Fix Worker';
+  static const String _defaultApiBaseUrl =
+      'https://click2fix-backend.onrender.com';
 
-  static const environment = String.fromEnvironment(
-    'ENVIRONMENT',
-    defaultValue: 'development',
-  );
+  static String get apiBaseUrl {
+    const configured = String.fromEnvironment('API_BASE_URL');
+    final value = configured.trim().isEmpty ? _defaultApiBaseUrl : configured;
+    return _normalizeBaseUrl(value);
+  }
 
-  static const apiBaseUrl = String.fromEnvironment(
-    'API_BASE_URL',
-    defaultValue: 'http://localhost:8080',
-  );
-
-  static const socketUrl = String.fromEnvironment(
-    'SOCKET_URL',
-    defaultValue: 'http://localhost:8080',
-  );
-
-  static const googleMapsApiKey = String.fromEnvironment(
-    'GOOGLE_MAPS_API_KEY',
-    defaultValue: '',
-  );
-
-  static const firebaseWebApiKey = String.fromEnvironment(
-    'FIREBASE_WEB_API_KEY',
-    defaultValue: '',
-  );
-
-  static const firebaseWebAppId = String.fromEnvironment(
-    'FIREBASE_WEB_APP_ID',
-    defaultValue: '',
-  );
-
-  static const firebaseWebMessagingSenderId = String.fromEnvironment(
-    'FIREBASE_WEB_MESSAGING_SENDER_ID',
-    defaultValue: '',
-  );
-
-  static const firebaseWebProjectId = String.fromEnvironment(
-    'FIREBASE_WEB_PROJECT_ID',
-    defaultValue: '',
-  );
+  static String _normalizeBaseUrl(String value) {
+    var normalized = value.trim();
+    if (normalized.endsWith('/')) {
+      normalized = normalized.substring(0, normalized.length - 1);
+    }
+    if (!normalized.startsWith('http://') &&
+        !normalized.startsWith('https://')) {
+      if (kIsWeb) {
+        normalized = 'https://$normalized';
+      } else {
+        normalized = 'http://$normalized';
+      }
+    }
+    return normalized;
+  }
 }

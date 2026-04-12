@@ -1,4 +1,5 @@
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'api_client.dart';
 
 class AuthService {
@@ -10,7 +11,6 @@ class AuthService {
   static const _phoneKey = 'click2fix_user_phone';
   static const _nameKey = 'click2fix_user_name';
 
-  /// Register a new user or worker
   Future<Map<String, dynamic>> register({
     required String role,
     required String phone,
@@ -22,67 +22,83 @@ class AuthService {
     final response = await _client.post('/api/auth/register', {
       'role': role,
       'phone': phone,
-      if (name != null) 'name': name,
-      if (email != null) 'email': email,
-      if (category != null) 'category': category,
+      if (name != null && name.isNotEmpty) 'name': name,
+      if (email != null && email.isNotEmpty) 'email': email,
+      if (category != null && category.isNotEmpty) 'category': category,
       if (experience != null) 'experience': experience,
     });
-    return response.data as Map<String, dynamic>;
+    return _asMap(response.data);
   }
 
-  /// Request login OTP
-  Future<Map<String, dynamic>> loginWithPhone(String phone, {String role = 'user'}) async {
+  Future<Map<String, dynamic>> loginWithPhone(
+    String phone, {
+    String role = 'user',
+  }) async {
     final response = await _client.post('/api/auth/login', {
       'role': role,
       'phone': phone,
     });
-    return response.data as Map<String, dynamic>;
+    return _asMap(response.data);
   }
 
-  /// Verify OTP and get token
-  Future<String> verifyOtp(String phone, String otp, {String role = 'user'}) async {
+  Future<String> verifyOtp(
+    String phone,
+    String otp, {
+    String role = 'user',
+  }) async {
     final response = await _client.post('/api/auth/verify-otp', {
       'role': role,
       'phone': phone,
       'otp': otp,
     });
-    final token = response.data['token'] as String;
+    final data = _asMap(response.data);
+    final token = (data['token'] ?? data['accessToken'] ?? '').toString();
+    if (token.isEmpty) {
+      throw ApiException('Login succeeded but no token was returned.');
+    }
     _client.setToken(token);
     return token;
   }
 
-  /// Request upload OTP
   Future<Map<String, dynamic>> requestUploadOtp(String phone) async {
-    final response = await _client.post('/api/auth/request-upload-otp', {'phone': phone});
-    return response.data as Map<String, dynamic>;
+    final response = await _client.post('/api/auth/request-upload-otp', {
+      'phone': phone,
+    });
+    return _asMap(response.data);
   }
 
-  /// Verify upload OTP
   Future<String> verifyUploadOtp(String phone, String otp) async {
     final response = await _client.post('/api/auth/verify-upload-otp', {
       'phone': phone,
       'otp': otp,
     });
-    return response.data['uploadToken'] as String;
+    final data = _asMap(response.data);
+    final uploadToken = (data['uploadToken'] ?? data['token'] ?? '').toString();
+    if (uploadToken.isEmpty) {
+      throw ApiException('Verification succeeded but upload token was missing.');
+    }
+    return uploadToken;
   }
 
-  /// Firebase phone login
   Future<Map<String, dynamic>> firebaseLogin({
     required String idToken,
     required String role,
     String? phone,
     String? name,
+    String? category,
+    int? experience,
   }) async {
     final response = await _client.post('/api/auth/firebase-login', {
       'idToken': idToken,
       'role': role,
-      if (phone != null) 'phone': phone,
-      if (name != null) 'name': name,
+      if (phone != null && phone.isNotEmpty) 'phone': phone,
+      if (name != null && name.isNotEmpty) 'name': name,
+      if (category != null && category.isNotEmpty) 'category': category,
+      if (experience != null) 'experience': experience,
     });
-    return response.data as Map<String, dynamic>;
+    return _asMap(response.data);
   }
 
-  /// Save session to local storage
   Future<void> saveSession({
     required String token,
     required String role,
@@ -92,16 +108,23 @@ class AuthService {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_tokenKey, token);
     await prefs.setString(_roleKey, role);
-    if (phone != null) await prefs.setString(_phoneKey, phone);
-    if (name != null) await prefs.setString(_nameKey, name);
+    if (phone != null && phone.isNotEmpty) {
+      await prefs.setString(_phoneKey, phone);
+    } else {
+      await prefs.remove(_phoneKey);
+    }
+    if (name != null && name.isNotEmpty) {
+      await prefs.setString(_nameKey, name);
+    } else {
+      await prefs.remove(_nameKey);
+    }
     _client.setToken(token);
   }
 
-  /// Restore session from local storage
   Future<Map<String, String?>?> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
-    if (token == null) return null;
+    if (token == null || token.isEmpty) return null;
 
     _client.setToken(token);
     return {
@@ -112,7 +135,6 @@ class AuthService {
     };
   }
 
-  /// Clear session
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(_tokenKey);
@@ -120,5 +142,15 @@ class AuthService {
     await prefs.remove(_phoneKey);
     await prefs.remove(_nameKey);
     _client.setToken(null);
+  }
+
+  Map<String, dynamic> _asMap(dynamic value) {
+    if (value is Map<String, dynamic>) return value;
+    if (value is Map) {
+      return value.map(
+        (key, item) => MapEntry(key.toString(), item),
+      );
+    }
+    return <String, dynamic>{};
   }
 }

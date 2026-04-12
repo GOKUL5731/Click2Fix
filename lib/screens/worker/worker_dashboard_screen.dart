@@ -17,8 +17,46 @@ class WorkerDashboardScreen extends ConsumerStatefulWidget {
 class _WorkerDashboardScreenState extends ConsumerState<WorkerDashboardScreen> {
   DateTime? _lastBackPressTime;
   bool _isMarkingDone = false;
-  // In a real app, this would be fetched from the API
   String? _activeBookingId;
+
+  static const _activeStatuses = {
+    'pending',
+    'confirmed',
+    'worker_on_way',
+    'arrived',
+    'work_started',
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _loadActiveBooking());
+  }
+
+  Future<void> _loadActiveBooking() async {
+    try {
+      final session = ref.read(sessionProvider);
+      final client = ref.read(apiClientProvider);
+      client.setToken(session.token);
+      final bookingService = BookingService(client);
+      final history = await bookingService.getHistory();
+      for (final raw in history) {
+        if (raw is! Map) continue;
+        final map = Map<String, dynamic>.from(raw);
+        final status = map['booking_status'] as String?;
+        if (status != null && _activeStatuses.contains(status)) {
+          final id = map['id']?.toString();
+          if (id != null && id.isNotEmpty) {
+            if (mounted) setState(() => _activeBookingId = id);
+            return;
+          }
+        }
+      }
+      if (mounted) setState(() => _activeBookingId = null);
+    } catch (_) {
+      if (mounted) setState(() => _activeBookingId = null);
+    }
+  }
 
   Future<void> _markJobDone() async {
     if (_activeBookingId == null) {
@@ -44,7 +82,7 @@ class _WorkerDashboardScreenState extends ConsumerState<WorkerDashboardScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('âœ… Job marked as complete! User has been notified.'),
+          content: Text('Job marked complete. The customer has been notified to leave a rating.'),
           backgroundColor: AppColors.successGreen,
           behavior: SnackBarBehavior.floating,
         ),

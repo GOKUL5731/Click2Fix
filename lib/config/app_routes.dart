@@ -40,6 +40,8 @@ final appRouter = GoRouter(
         return OtpScreen(
           phone: extra?['phone'] as String?,
           isWorker: extra?['isWorker'] as bool? ?? false,
+          firebaseVerificationId: extra?['verificationId'] as String?,
+          firebaseE164Phone: extra?['e164Phone'] as String?,
         );
       },
     ),

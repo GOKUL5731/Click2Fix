@@ -1,6 +1,7 @@
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { query, redis } from '../database/client';
+import type { ActorRole } from '../models/types';
 import { httpError } from '../middleware/error';
 import { sendPushToActor } from './notification.service';
 
@@ -86,21 +87,39 @@ export async function getLiveLocation(bookingId: string) {
   return worker.rows[0] ?? null;
 }
 
-export async function completeBooking(input: z.infer<typeof completeBookingSchema>) {
-  const booking = await query<{ completion_otp_hash: string }>(
-    'SELECT completion_otp_hash FROM bookings WHERE id = $1',
-    [input.bookingId]
-  );
+export async function completeBooking(
+  input: z.infer<typeof completeBookingSchema>,
+  auth: { sub: string; role: ActorRole }
+) {
+  const booking = await query<{
+    completion_otp_hash: string | null;
+    worker_id: string;
+    user_id: string;
+  }>('SELECT completion_otp_hash, worker_id, user_id FROM bookings WHERE id = $1', [input.bookingId]);
 
   if (!booking.rows[0]) {
     throw httpError(404, 'Booking not found');
   }
 
-  if (input.completionOtp) {
-    const valid = await bcrypt.compare(input.completionOtp, booking.rows[0].completion_otp_hash);
+  const row = booking.rows[0];
+
+  if (auth.role === 'worker') {
+    if (row.worker_id !== auth.sub) {
+      throw httpError(403, 'Only the assigned worker can mark this job complete');
+    }
+  } else if (auth.role === 'user') {
+    if (row.user_id !== auth.sub) {
+      throw httpError(403, 'Not your booking');
+    }
+    if (!input.completionOtp || !row.completion_otp_hash) {
+      throw httpError(400, 'Completion code is required to finish this booking as a customer');
+    }
+    const valid = await bcrypt.compare(input.completionOtp, row.completion_otp_hash);
     if (!valid) {
       throw httpError(401, 'Invalid completion OTP');
     }
+  } else {
+    throw httpError(403, 'Only the worker or customer can complete this booking');
   }
 
   const result = await query(
@@ -123,7 +142,11 @@ export async function completeBooking(input: z.infer<typeof completeBookingSchem
   void sendPushToActor('user', completedBooking.user_id, {
     title: 'Booking completed',
     message: 'Your service has been marked as completed. Please add a review.',
-    data: { bookingId: completedBooking.id }
+    data: {
+      bookingId: String(completedBooking.id),
+      workerId: String(completedBooking.worker_id),
+      action: 'rate_worker'
+    }
   });
 
   void sendPushToActor('worker', completedBooking.worker_id, {

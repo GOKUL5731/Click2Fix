@@ -1,16 +1,31 @@
+import 'dart:async';
+
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
+import '../services/api_client.dart';
 import '../services/auth_service.dart';
+import '../services/device_token_sync.dart';
 import '../widgets/primary_action_button.dart';
 
 class OtpScreen extends ConsumerStatefulWidget {
-  const OtpScreen({this.phone, this.isWorker = false, super.key});
+  const OtpScreen({
+    this.phone,
+    this.isWorker = false,
+    this.firebaseVerificationId,
+    this.firebaseE164Phone,
+    super.key,
+  });
 
   final String? phone;
   final bool isWorker;
+  /// When set, OTP is verified with Firebase Phone Auth then exchanged for a JWT via `/api/auth/firebase-login`.
+  final String? firebaseVerificationId;
+  final String? firebaseE164Phone;
 
   @override
   ConsumerState<OtpScreen> createState() => _OtpScreenState();
@@ -22,10 +37,12 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
   bool _isLoading = false;
   int _resendSeconds = 30;
   bool _canResend = false;
+  String? _firebaseVerificationId;
 
   @override
   void initState() {
     super.initState();
+    _firebaseVerificationId = widget.firebaseVerificationId;
     _startResendTimer();
   }
 
@@ -54,52 +71,123 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       return;
     }
 
+    final router = GoRouter.of(context);
+    final scaffoldMessenger = ScaffoldMessenger.of(context);
+
     setState(() => _isLoading = true);
-    final role = widget.isWorker ? 'worker' : 'user';
+    final roleStr = widget.isWorker ? 'worker' : 'user';
+    final sessionRole = widget.isWorker ? UserRole.worker : UserRole.user;
+    final client = ref.read(apiClientProvider);
+    final authService = AuthService(client);
 
     try {
-      // Use the shared ApiClient from provider so the token propagates everywhere
-      final client = ref.read(apiClientProvider);
-      final authService = AuthService(client);
-      final token = await authService.verifyOtp(
-        widget.phone ?? '',
-        _otp,
-        role: role,
-      );
+      String token;
 
-      final sessionRole = widget.isWorker ? UserRole.worker : UserRole.user;
-      // sessionProvider.login() persists the session internally
+      if (_firebaseVerificationId != null && _firebaseVerificationId!.isNotEmpty) {
+        final credential = PhoneAuthProvider.credential(
+          verificationId: _firebaseVerificationId!,
+          smsCode: _otp,
+        );
+        final cred = await FirebaseAuth.instance.signInWithCredential(credential);
+        final idToken = await cred.user?.getIdToken();
+        if (idToken == null || idToken.isEmpty) {
+          throw ApiException('Firebase did not return an ID token.');
+        }
+        final data = await authService.firebaseLogin(
+          idToken: idToken,
+          role: roleStr,
+          phone: widget.phone,
+        );
+        token = (data['token'] ?? data['accessToken'] ?? '').toString();
+        if (token.isEmpty) {
+          throw ApiException('Login succeeded but no token was returned.');
+        }
+      } else {
+        token = await authService.verifyOtp(
+          widget.phone ?? '',
+          _otp,
+          role: roleStr,
+        );
+      }
+
       ref.read(sessionProvider.notifier).login(
             token: token,
             role: sessionRole,
             phone: widget.phone,
           );
+      client.setToken(token);
+      await syncFcmDeviceToken(client);
 
       if (!mounted) return;
       setState(() => _isLoading = false);
-      context.go(widget.isWorker ? '/worker/dashboard' : '/home');
+      router.go(widget.isWorker ? '/worker/dashboard' : '/home');
     } catch (e) {
-      // Fallback to dev mode OTP (123456)
       if (!mounted) return;
-      if (_otp == '123456') {
-        final sessionRole = widget.isWorker ? UserRole.worker : UserRole.user;
+      if (_firebaseVerificationId == null && _otp == '123456') {
         ref.read(sessionProvider.notifier).login(
               token: 'dev-token-${DateTime.now().millisecondsSinceEpoch}',
               role: sessionRole,
               phone: widget.phone,
               name: widget.isWorker ? 'Worker' : 'User',
             );
+        client.setToken(ref.read(sessionProvider).token);
+        await syncFcmDeviceToken(client);
+        if (!mounted) return;
         setState(() => _isLoading = false);
-        context.go(widget.isWorker ? '/worker/dashboard' : '/home');
+        router.go(widget.isWorker ? '/worker/dashboard' : '/home');
       } else {
+        if (!mounted) return;
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Invalid OTP. Use 123456 for demo.'),
+        final message = e is ApiException
+            ? e.message
+            : 'Invalid or expired OTP. Please try again.';
+        scaffoldMessenger.showSnackBar(
+          SnackBar(
+            content: Text(message),
             backgroundColor: AppColors.emergencyRed,
           ),
         );
       }
+    }
+  }
+
+  Future<void> _resendOtp() async {
+    if (!_canResend) return;
+    _startResendTimer();
+    final digits = widget.phone ?? '';
+    final role = widget.isWorker ? 'worker' : 'user';
+    final client = ref.read(apiClientProvider);
+    final authService = AuthService(client);
+    try {
+      if (widget.firebaseE164Phone != null &&
+          widget.firebaseE164Phone!.isNotEmpty) {
+        final completer = Completer<String>();
+        FirebaseAuth.instance.verifyPhoneNumber(
+          phoneNumber: widget.firebaseE164Phone!,
+          verificationCompleted: (_) {},
+          verificationFailed: (e) {
+            if (!completer.isCompleted) completer.completeError(e);
+          },
+          codeSent: (verificationId, _) {
+            if (!completer.isCompleted) completer.complete(verificationId);
+          },
+          codeAutoRetrievalTimeout: (String verificationId) {},
+          timeout: const Duration(seconds: 120),
+        );
+        final newId = await completer.future.timeout(const Duration(seconds: 90));
+        if (!mounted) return;
+        setState(() => _firebaseVerificationId = newId);
+      } else {
+        await authService.loginWithPhone(digits, role: role);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('A new code has been sent.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      final message = e is ApiException ? e.message : 'Could not resend OTP.';
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -148,21 +236,23 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               'Enter the 6-digit code sent to +91 ${widget.phone ?? ''}',
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
             ),
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: AppColors.trustGold.withAlpha(20),
-                borderRadius: BorderRadius.circular(8),
+            if (_firebaseVerificationId == null) ...[
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.trustGold.withAlpha(20),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'Dev / SMS login: use OTP 123456 when the backend is in development mode.',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: AppColors.trustGold,
+                        fontWeight: FontWeight.w600,
+                      ),
+                ),
               ),
-              child: Text(
-                'Demo OTP: 123456',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: AppColors.trustGold,
-                      fontWeight: FontWeight.w600,
-                    ),
-              ),
-            ),
+            ],
             const SizedBox(height: 36),
             // OTP input
             Row(
@@ -210,12 +300,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
             Center(
               child: _canResend
                   ? TextButton(
-                      onPressed: () {
-                        _startResendTimer();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('OTP resent!')),
-                        );
-                      },
+                      onPressed: _resendOtp,
                       child: const Text('Resend OTP'),
                     )
                   : Text(

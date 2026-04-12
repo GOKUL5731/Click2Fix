@@ -16,7 +16,11 @@ class _PaymentScreenState extends State<PaymentScreen> {
   void _pay() {
     setState(() => _isProcessing = true);
     Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) { setState(() => _isProcessing = false); context.go('/review'); }
+      if (mounted) {
+        setState(() => _isProcessing = false);
+        final extra = GoRouterState.of(context).extra;
+        context.go('/review', extra: extra);
+      }
     });
   }
 

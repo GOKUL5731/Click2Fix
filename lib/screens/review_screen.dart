@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
+import '../services/api_client.dart';
 import '../services/booking_service.dart';
 import '../widgets/star_rating.dart';
 import '../widgets/primary_action_button.dart';
@@ -44,21 +45,31 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     final bookingId = extra?['bookingId'] as String?;
     final workerId = extra?['workerId'] as String?;
 
+    if (bookingId == null || workerId == null) {
+      if (!mounted) return;
+      setState(() => _isSubmitting = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Missing booking information. Open this screen from your completed booking.'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
     try {
-      if (bookingId != null && workerId != null) {
-        final session = ref.read(sessionProvider);
-        final client = ref.read(apiClientProvider);
-        client.setToken(session.token);
-        final bookingService = BookingService(client);
-        await bookingService.submitRating(
-          bookingId: bookingId,
-          workerId: workerId,
-          rating: _rating.round(),
-          comment: _commentController.text.trim().isNotEmpty
-              ? _commentController.text.trim()
-              : null,
-        );
-      }
+      final session = ref.read(sessionProvider);
+      final client = ref.read(apiClientProvider);
+      client.setToken(session.token);
+      final bookingService = BookingService(client);
+      await bookingService.submitRating(
+        bookingId: bookingId,
+        workerId: workerId,
+        rating: _rating.round(),
+        comment: _commentController.text.trim().isNotEmpty
+            ? _commentController.text.trim()
+            : null,
+      );
 
       if (!mounted) return;
       setState(() {
@@ -68,7 +79,7 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Thank you for your review! ðŸ™'),
+          content: Text('Thank you for your review!'),
           backgroundColor: AppColors.successGreen,
           behavior: SnackBarBehavior.floating,
         ),
@@ -79,14 +90,10 @@ class _ReviewScreenState extends ConsumerState<ReviewScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isSubmitting = false);
-      // Even if API fails, show success and navigate home (review is best-effort)
+      final message = e is ApiException ? e.message : 'Could not submit review. Please try again.';
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Review submitted! Thank you ðŸ™'),
-          behavior: SnackBarBehavior.floating,
-        ),
+        SnackBar(content: Text(message), behavior: SnackBarBehavior.floating),
       );
-      context.go('/home');
     }
   }
 

@@ -1,3 +1,4 @@
+import type { Request, Response } from 'express';
 import { Router } from 'express';
 
 export const versionRoutes = Router();
@@ -12,6 +13,9 @@ const APP_VERSION_INFO = {
   releaseNotes: process.env.RELEASE_NOTES ?? 'Bug fixes and performance improvements',
 };
 
-versionRoutes.get('/', (_req, res) => {
+const sendVersion = (_req: Request, res: Response) => {
   res.json(APP_VERSION_INFO);
-});
+};
+
+versionRoutes.get('/', sendVersion);
+versionRoutes.get('/version', sendVersion);

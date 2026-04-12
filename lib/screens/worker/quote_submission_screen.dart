@@ -69,11 +69,13 @@ class _QuoteState extends State<QuoteSubmissionScreen> {
             onPressed: () {
               setState(() => _isSending = true);
               Future.delayed(const Duration(milliseconds: 1000), () {
-                if (mounted) {
-                  setState(() => _isSending = false);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quote sent successfully! ✓')));
-                  context.go('/worker/dashboard');
-                }
+                if (!mounted) return;
+                setState(() => _isSending = false);
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Quote sent successfully!')),
+                );
+                context.go('/worker/dashboard');
               });
             },
           ),

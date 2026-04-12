@@ -1,4 +1,6 @@
-﻿import 'package:dio/dio.dart';
+﻿import 'dart:typed_data';
+
+import 'package:dio/dio.dart';
 import 'api_client.dart';
 
 class IssueService {
@@ -13,7 +15,11 @@ class IssueService {
     double? longitude,
     bool isEmergency = false,
     String? imagePath,
+    Uint8List? imageBytes,
+    String imageFilename = 'issue_image.jpg',
     String? voicePath,
+    Uint8List? voiceBytes,
+    String voiceFilename = 'voice_note.webm',
     String? uploadToken,
   }) async {
     final fields = <String, dynamic>{
@@ -26,17 +32,27 @@ class IssueService {
 
     final files = <MapEntry<String, MultipartFile>>[];
 
-    if (imagePath != null) {
+    if (imageBytes != null) {
       files.add(MapEntry(
         'files',
-        await MultipartFile.fromFile(imagePath, filename: 'issue_image.jpg'),
+        MultipartFile.fromBytes(imageBytes, filename: imageFilename),
+      ));
+    } else if (imagePath != null) {
+      files.add(MapEntry(
+        'files',
+        await MultipartFile.fromFile(imagePath, filename: imageFilename),
       ));
     }
 
-    if (voicePath != null) {
+    if (voiceBytes != null) {
       files.add(MapEntry(
         'files',
-        await MultipartFile.fromFile(voicePath, filename: 'voice_note.webm'),
+        MultipartFile.fromBytes(voiceBytes, filename: voiceFilename),
+      ));
+    } else if (voicePath != null) {
+      files.add(MapEntry(
+        'files',
+        await MultipartFile.fromFile(voicePath, filename: voiceFilename),
       ));
     }
 
@@ -62,36 +78,31 @@ class IssueService {
 
   /// Analyze an image file by uploading it directly to the backend.
   /// Returns AI-detected category and description.
-  Future<Map<String, dynamic>> analyzeImageFile(String imagePath) async {
-    final file = await MultipartFile.fromFile(
-      imagePath,
-      filename: 'issue_image.jpg',
-    );
+  Future<Map<String, dynamic>> analyzeImageFile({
+    String? imagePath,
+    Uint8List? imageBytes,
+    String filename = 'issue_image.jpg',
+  }) async {
+    if (imageBytes == null && (imagePath == null || imagePath.isEmpty)) {
+      throw ArgumentError('Provide imageBytes or imagePath');
+    }
+    final MultipartFile file = imageBytes != null
+        ? MultipartFile.fromBytes(imageBytes, filename: filename)
+        : await MultipartFile.fromFile(imagePath!, filename: filename);
     final formData = FormData.fromMap({'file': file});
 
-    try {
-      final dio = Dio(BaseOptions(
-        baseUrl: _client.baseUrl,
-        connectTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 60),
-      ));
-      // Copy auth token if present
-      final token = _client.token;
-      if (token != null) {
-        dio.options.headers['Authorization'] = 'Bearer $token';
-      }
-      final response = await dio.post('/api/ai/analyze-image-file', data: formData);
-      return response.data as Map<String, dynamic>;
-    } catch (e) {
-      // Graceful fallback â€” AI unavailable, return placeholder
-      return {
-        'category': 'unknown',
-        'description':
-            'AI analysis unavailable. Please describe the problem manually.',
-        'confidence': 0.0,
-        'details': ['Could not connect to AI service'],
-      };
+    final response =
+        await _client.postMultipart('/api/ai/analyze-image-file', formData);
+    final data = response.data;
+    if (data is Map<String, dynamic>) return data;
+    if (data is Map) {
+      return data.map((k, v) => MapEntry(k.toString(), v));
     }
+    return {
+      'category': 'unknown',
+      'description': 'Could not parse AI response.',
+      'confidence': 0.0,
+    };
   }
 
   /// Get AI analysis for an image URL
