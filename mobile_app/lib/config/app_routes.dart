@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../screens/splash_screen.dart';
 import '../screens/onboarding_screen.dart';
 import '../screens/login_screen.dart';
-import '../screens/register_screen.dart';
+import '../screens/email_login_screen.dart';
+import '../screens/register_profile_screen.dart';
 import '../screens/otp_screen.dart';
 import '../screens/home_dashboard_screen.dart';
 import '../screens/upload_issue_screen.dart';
@@ -32,7 +33,18 @@ final appRouter = GoRouter(
     GoRoute(path: '/', builder: (context, state) => const SplashScreen()),
     GoRoute(path: '/onboarding', builder: (context, state) => const OnboardingScreen()),
     GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-    GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
+    GoRoute(path: '/email-login', builder: (context, state) => const EmailLoginScreen()),
+    GoRoute(
+      path: '/register-profile',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return RegisterProfileScreen(
+          phone: extra?['phone'] as String? ?? '',
+          isWorker: extra?['isWorker'] as bool? ?? false,
+          firebaseToken: extra?['firebaseToken'] as String? ?? '',
+        );
+      },
+    ),
     GoRoute(
       path: '/otp',
       builder: (context, state) {
@@ -40,6 +52,7 @@ final appRouter = GoRouter(
         return OtpScreen(
           phone: extra?['phone'] as String?,
           isWorker: extra?['isWorker'] as bool? ?? false,
+          isLoginMode: extra?['isLoginMode'] as bool? ?? true,
         );
       },
     ),

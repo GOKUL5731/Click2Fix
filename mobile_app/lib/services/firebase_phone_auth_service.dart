@@ -134,13 +134,15 @@ class FirebasePhoneAuthService {
     String? phone,
     String? name,
     String? category,
+    String? email,
   }) async {
     final response = await _apiClient.post('/auth/firebase-login', {
-      'idToken': firebaseIdToken,
+      'firebaseToken': firebaseIdToken,
       'role': role,
       if (phone != null) 'phone': phone,
       if (name != null) 'name': name,
       if (category != null) 'category': category,
+      if (email != null) 'email': email,
     });
     return response.data as Map<String, dynamic>;
   }
@@ -177,6 +179,58 @@ class FirebasePhoneAuthService {
       'firebaseUid': user.uid,
     });
     return response.data as Map<String, dynamic>;
+  }
+
+  // ── Email Sign In ──────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> signInWithEmail({
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    final userCredential = await _auth.signInWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    final user = userCredential.user;
+    if (user == null) throw Exception('Firebase sign-in returned no user.');
+
+    final idToken = await user.getIdToken(true);
+    if (idToken == null) throw Exception('Could not obtain Firebase ID token.');
+
+    final backendResponse = await exchangeForBackendJwt(
+      firebaseIdToken: idToken,
+      role: role,
+      email: email,
+    );
+    return backendResponse;
+  }
+
+  Future<Map<String, dynamic>> registerWithEmail({
+    required String email,
+    required String password,
+    required String role,
+    required String name,
+    String? category,
+  }) async {
+    final userCredential = await _auth.createUserWithEmailAndPassword(
+      email: email,
+      password: password,
+    );
+    final user = userCredential.user;
+    if (user == null) throw Exception('Firebase creation returned no user.');
+
+    final idToken = await user.getIdToken(true);
+    if (idToken == null) throw Exception('Could not obtain Firebase ID token.');
+
+    final backendResponse = await exchangeForBackendJwt(
+      firebaseIdToken: idToken,
+      role: role,
+      email: email,
+      name: name,
+      category: category,
+    );
+    return backendResponse;
   }
 
   // ── Sign out ────────────────────────────────────────────────────────

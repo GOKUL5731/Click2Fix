@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
 import '../services/api_client.dart';
+import '../services/auth_service.dart';
 import '../services/firebase_phone_auth_service.dart';
 import '../widgets/primary_action_button.dart';
 
@@ -17,9 +18,12 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
   final _apiClient = ApiClient();
+  late final _authService = AuthService(_apiClient);
   late final _firebaseAuthService = FirebasePhoneAuthService(_apiClient);
+  
   bool _isWorker = false;
   bool _isLoading = false;
+  bool _isLoginMode = true; // true = Login, false = Register
 
   @override
   void dispose() {
@@ -32,72 +36,114 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     final phone = _phoneController.text.trim();
     if (phone.length < 10) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid phone number')),
+        const SnackBar(content: Text('Please enter a valid 10-digit phone number')),
       );
       return;
     }
     
-    // Convert to E.164 required by Firebase
     final countryCode = phone.startsWith('+') ? '' : '+91';
     final fullPhone = '$countryCode$phone';
 
     setState(() => _isLoading = true);
 
-    await _firebaseAuthService.sendOtp(
-      fullPhone,
-      onCodeSent: (verificationId) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          context.go('/otp', extra: {
-            'phone': fullPhone,
-            'isWorker': _isWorker,
-            'verificationId': verificationId,
-            'firebaseAuthService': _firebaseAuthService,
-          });
-        }
-      },
-      onAutoVerified: (credential) async {
-        // Handle instant verification (Android only)
-        try {
-          final result = await _firebaseAuthService.signInWithCredential(credential);
-          final role = _isWorker ? 'worker' : 'user';
-          final backendResponse = await _firebaseAuthService.exchangeForBackendJwt(
-            firebaseIdToken: result.firebaseIdToken,
-            role: role,
-            phone: result.phoneNumber,
-          );
-          
-          final token = backendResponse['token'] as String;
-          final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
-          
-          ref.read(sessionProvider.notifier).login(
-            token: token,
-            role: sessionRole,
-            phone: result.phoneNumber,
-          );
+    try {
+      // Pre-check user existence to guide them properly
+      final checkRes = await _authService.checkUser(phone: fullPhone);
+      final exists = checkRes['exists'] == true;
 
+      // Prevent sending OTP if they are on the wrong flow to save SMS costs
+      if (_isLoginMode && !exists) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account not found. Please register first.')),
+        );
+        return;
+      } else if (!_isLoginMode && exists) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Account already exists. Please login.')),
+        );
+        return;
+      }
+
+      await _firebaseAuthService.sendOtp(
+        fullPhone,
+        onCodeSent: (verificationId) {
           if (mounted) {
             setState(() => _isLoading = false);
-            context.go(_isWorker ? '/worker/dashboard' : '/home');
+            context.go('/otp', extra: {
+              'phone': fullPhone,
+              'isWorker': _isWorker,
+              'isLoginMode': _isLoginMode,
+              'verificationId': verificationId,
+              'firebaseAuthService': _firebaseAuthService,
+            });
           }
-        } catch (e) {
+        },
+        onAutoVerified: (credential) async {
+          try {
+            final result = await _firebaseAuthService.signInWithCredential(credential);
+            
+            if (!_isLoginMode) {
+              // Registration: redirect to complete profile
+              if (mounted) {
+                setState(() => _isLoading = false);
+                context.go('/register-profile', extra: {
+                  'phone': result.phoneNumber ?? fullPhone,
+                  'isWorker': _isWorker,
+                  'firebaseToken': result.firebaseIdToken,
+                });
+              }
+              return;
+            }
+
+            // Login: exchange token directly
+            final role = _isWorker ? 'worker' : 'user';
+            final backendResponse = await _firebaseAuthService.exchangeForBackendJwt(
+              firebaseIdToken: result.firebaseIdToken,
+              role: role,
+              phone: result.phoneNumber,
+            );
+            
+            final token = backendResponse['token'] as String;
+            final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
+            
+            ref.read(sessionProvider.notifier).login(
+              token: token,
+              role: sessionRole,
+              phone: result.phoneNumber,
+            );
+
+            if (mounted) {
+              setState(() => _isLoading = false);
+              context.go(_isWorker ? '/worker/dashboard' : '/home');
+            }
+          } catch (e) {
+            if (mounted) {
+              setState(() => _isLoading = false);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('Verification failed: $e')),
+              );
+            }
+          }
+        },
+        onError: (msg) {
           if (mounted) {
             setState(() => _isLoading = false);
             ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Verification failed: $e')),
+              SnackBar(content: Text(msg), backgroundColor: AppColors.emergencyRed),
             );
           }
-        }
-      },
-      onError: (msg) {
-        if (mounted) {
-          setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(msg), backgroundColor: AppColors.emergencyRed),
-          );
-        }
-      },
-    );
+        },
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Network error. Check your connection.')),
+        );
+      }
+    }
   }
 
   Future<void> _signInWithGoogle() async {
@@ -126,6 +172,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
     }
+  }
+
+  void _navToEmailLogin() {
+    context.push('/email-login');
   }
 
   @override
@@ -177,7 +227,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 ],
               ),
             ),
-            const SizedBox(height: 36),
+            const SizedBox(height: 30),
             // Form
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
@@ -185,15 +235,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Login or Register',
+                    _isLoginMode ? 'Login to continue' : 'Register a new account',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'We\'ll send you a secure OTP via Firebase',
+                    'We\'ll send you a secure OTP via SMS',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
                   // Role toggle
                   Container(
                     decoration: BoxDecoration(
@@ -230,7 +280,27 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                     ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 10),
+                  
+                  // Register / Login Switcher
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _isLoginMode = !_isLoginMode;
+                        });
+                      },
+                      child: Text(
+                        _isLoginMode 
+                            ? 'New user? Register here' 
+                            : 'Already have an account? Login',
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ),
+                  ),
+                  
+                  const SizedBox(height: 10),
+                  
                   // Send OTP button
                   PrimaryActionButton(
                     label: 'Send OTP',
@@ -238,7 +308,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     isLoading: _isLoading,
                     onPressed: _sendOtp,
                   ),
-                  const SizedBox(height: 16),
+                  
+                  const SizedBox(height: 20),
                   Row(
                     children: [
                       const Expanded(child: Divider()),
@@ -252,14 +323,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       const Expanded(child: Divider()),
                     ],
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: 20),
+                  
                   PrimaryActionButton(
-                    label: 'Sign in with Google',
+                    label: 'Continue with Google',
                     icon: Icons.g_mobiledata,
                     isLoading: _isLoading,
                     onPressed: _signInWithGoogle,
                   ),
-                  const SizedBox(height: 24),
+                  
+                  const SizedBox(height: 16),
+                  
+                  OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      minimumSize: const Size(double.infinity, 54),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    ),
+                    label: const Text('Continue with Email'),
+                    icon: const Icon(Icons.email_outlined),
+                    onPressed: _navToEmailLogin,
+                  ),
+                  
+                  const SizedBox(height: 40),
                 ],
               ),
             ),

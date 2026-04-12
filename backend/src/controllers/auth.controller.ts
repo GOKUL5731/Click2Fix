@@ -2,6 +2,10 @@ import type { Request, Response } from 'express';
 import { asyncHandler } from '../middleware/error';
 import * as authService from '../services/auth.service';
 
+export const checkUser = asyncHandler(async (req: Request, res: Response) => {
+  res.json(await authService.checkUser(req.body));
+});
+
 export const register = asyncHandler(async (req: Request, res: Response) => {
   res.status(201).json(await authService.register(req.body));
 });

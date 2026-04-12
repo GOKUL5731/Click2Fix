@@ -49,12 +49,23 @@ export const verifyUploadOtpSchema = z.object({
 
 export const firebaseLoginSchema = z.object({
   role: z.enum(['user', 'worker']).default('user'),
-  idToken: z.string().min(20),
+  idToken: z.string().min(20).optional(),
+  firebaseToken: z.string().min(20).optional(),
   phone: z.string().min(8).max(20).optional(),
+  email: z.string().email().optional(),
   name: z.string().min(2).max(120).optional(),
   category: z.string().max(80).optional(),
   experience: z.number().int().min(0).max(60).optional(),
   deviceId: z.string().max(180).optional()
+}).refine(data => data.idToken || data.firebaseToken, {
+  message: "Either idToken or firebaseToken must be provided"
+});
+
+export const checkUserSchema = z.object({
+  phone: z.string().min(8).max(20).optional(),
+  email: z.string().email().optional(),
+}).refine(data => data.phone || data.email, {
+  message: "Either phone or email must be provided"
 });
 
 export const googleLoginSchema = z.object({
@@ -141,6 +152,26 @@ function signToken(payload: AuthTokenPayload) {
 }
 
 // ── Auth flows ──────────────────────────────────────────────────────
+
+export async function checkUser(input: { phone?: string; email?: string }) {
+  if (input.phone) {
+    const userRes = await query('SELECT id FROM users WHERE phone = $1', [input.phone]);
+    if (userRes.rows.length > 0) return { exists: true, role: 'user' };
+    
+    const workerRes = await query('SELECT id FROM workers WHERE phone = $1', [input.phone]);
+    if (workerRes.rows.length > 0) return { exists: true, role: 'worker' };
+  }
+  
+  if (input.email) {
+    const userRes = await query('SELECT id FROM users WHERE email = $1', [input.email]);
+    if (userRes.rows.length > 0) return { exists: true, role: 'user' };
+    
+    const workerRes = await query('SELECT id FROM workers WHERE email = $1', [input.email]);
+    if (workerRes.rows.length > 0) return { exists: true, role: 'worker' };
+  }
+  
+  return { exists: false };
+}
 
 export async function register(input: RegisterInput) {
   const passwordHash = input.password ? await bcrypt.hash(input.password, 12) : null;
@@ -328,7 +359,11 @@ function firebaseSyntheticPhone(uid: string): string {
 }
 
 export async function firebaseLogin(input: FirebaseLoginInput) {
-  const identity = await verifyFirebaseIdToken(input.idToken);
+  const tokenToUse = input.firebaseToken || input.idToken;
+  if (!tokenToUse) {
+    throw httpError(400, 'Firebase token is required');
+  }
+  const identity = await verifyFirebaseIdToken(tokenToUse);
   let phone = (input.phone ?? identity.phone)?.trim();
   if (!phone) {
     if (identity.email) {
@@ -373,7 +408,7 @@ export async function firebaseLogin(input: FirebaseLoginInput) {
          email = COALESCE(EXCLUDED.email, users.email),
          profile_photo = COALESCE(EXCLUDED.profile_photo, users.profile_photo)
      RETURNING id, phone, email`,
-    [input.name ?? identity.name ?? null, phone, identity.email ?? null, identity.picture ?? null]
+    [input.name ?? identity.name ?? null, phone, input.email ?? identity.email ?? null, identity.picture ?? null]
   );
 
   const user = userResult.rows[0];

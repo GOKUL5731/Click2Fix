@@ -10,6 +10,7 @@ class OtpScreen extends ConsumerStatefulWidget {
   const OtpScreen({
     this.phone,
     this.isWorker = false,
+    this.isLoginMode = true,
     this.verificationId,
     this.firebaseAuthService,
     super.key,
@@ -17,6 +18,7 @@ class OtpScreen extends ConsumerStatefulWidget {
 
   final String? phone;
   final bool isWorker;
+  final bool isLoginMode;
   final String? verificationId;
   final FirebasePhoneAuthService? firebaseAuthService;
 
@@ -75,7 +77,19 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       // 1. Verify OTP with Firebase
       final result = await widget.firebaseAuthService!.verifyOtp(_otp);
 
-      // 2. Exchange Firebase ID token for Backend JWT
+      if (!widget.isLoginMode) {
+        // Must complete profile!
+        if (!mounted) return;
+        setState(() => _isLoading = false);
+        context.go('/register-profile', extra: {
+          'phone': result.phoneNumber ?? widget.phone,
+          'isWorker': widget.isWorker,
+          'firebaseToken': result.firebaseIdToken,
+        });
+        return;
+      }
+
+      // 2. Exchange Firebase ID token for Backend JWT (Login Mode)
       final role = widget.isWorker ? 'worker' : 'user';
       final backendResponse = await widget.firebaseAuthService!.exchangeForBackendJwt(
         firebaseIdToken: result.firebaseIdToken,

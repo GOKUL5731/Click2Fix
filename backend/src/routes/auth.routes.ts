@@ -3,10 +3,11 @@ import * as authController from '../controllers/auth.controller';
 import { authenticate } from '../middleware/auth';
 import { otpLimiter } from '../middleware/rateLimit';
 import { validateBody } from '../middleware/validate';
-import { firebaseLoginSchema, loginSchema, registerSchema, verifyOtpSchema, requestUploadOtpSchema, verifyUploadOtpSchema, googleLoginSchema } from '../services/auth.service';
+import { firebaseLoginSchema, loginSchema, registerSchema, verifyOtpSchema, requestUploadOtpSchema, verifyUploadOtpSchema, googleLoginSchema, checkUserSchema } from '../services/auth.service';
 
 export const authRoutes = Router();
 
+authRoutes.post('/check-user', validateBody(checkUserSchema), authController.checkUser);
 authRoutes.post('/register', otpLimiter, validateBody(registerSchema), authController.register);
 authRoutes.post('/login', otpLimiter, validateBody(loginSchema), authController.login);
 authRoutes.post('/google-login', validateBody(googleLoginSchema), authController.googleLogin);

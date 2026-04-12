@@ -39,6 +39,15 @@ class AuthService {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Check if user exists
+  Future<Map<String, dynamic>> checkUser({String? phone, String? email}) async {
+    final response = await _client.post('/auth/check-user', {
+      if (phone != null) 'phone': phone,
+      if (email != null) 'email': email,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
   /// Verify OTP and get token
   Future<String> verifyOtp(String phone, String otp, {String role = 'user'}) async {
     final response = await _client.post('/auth/verify-otp', {
