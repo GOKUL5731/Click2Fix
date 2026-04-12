@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
 import '../services/api_client.dart';
-import '../services/auth_service.dart';
+import '../services/firebase_phone_auth_service.dart';
 import '../widgets/primary_action_button.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -17,13 +17,14 @@ class LoginScreen extends ConsumerStatefulWidget {
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
   final _apiClient = ApiClient();
-  late final _authService = AuthService(_apiClient);
+  late final _firebaseAuthService = FirebasePhoneAuthService(_apiClient);
   bool _isWorker = false;
   bool _isLoading = false;
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _firebaseAuthService.dispose();
     super.dispose();
   }
 
@@ -35,19 +36,94 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       );
       return;
     }
+    
+    // Convert to E.164 required by Firebase
+    final countryCode = phone.startsWith('+') ? '' : '+91';
+    final fullPhone = '$countryCode$phone';
+
+    setState(() => _isLoading = true);
+
+    await _firebaseAuthService.sendOtp(
+      fullPhone,
+      onCodeSent: (verificationId) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          context.go('/otp', extra: {
+            'phone': fullPhone,
+            'isWorker': _isWorker,
+            'verificationId': verificationId,
+            'firebaseAuthService': _firebaseAuthService,
+          });
+        }
+      },
+      onAutoVerified: (credential) async {
+        // Handle instant verification (Android only)
+        try {
+          final result = await _firebaseAuthService.signInWithCredential(credential);
+          final role = _isWorker ? 'worker' : 'user';
+          final backendResponse = await _firebaseAuthService.exchangeForBackendJwt(
+            firebaseIdToken: result.firebaseIdToken,
+            role: role,
+            phone: result.phoneNumber,
+          );
+          
+          final token = backendResponse['token'] as String;
+          final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
+          
+          ref.read(sessionProvider.notifier).login(
+            token: token,
+            role: sessionRole,
+            phone: result.phoneNumber,
+          );
+
+          if (mounted) {
+            setState(() => _isLoading = false);
+            context.go(_isWorker ? '/worker/dashboard' : '/home');
+          }
+        } catch (e) {
+          if (mounted) {
+            setState(() => _isLoading = false);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Verification failed: $e')),
+            );
+          }
+        }
+      },
+      onError: (msg) {
+        if (mounted) {
+          setState(() => _isLoading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(msg), backgroundColor: AppColors.emergencyRed),
+          );
+        }
+      },
+    );
+  }
+
+  Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
       final role = _isWorker ? 'worker' : 'user';
-      await _authService.loginWithPhone(phone, role: role);
+      final response = await _firebaseAuthService.signInWithGoogle(role: role);
+      
+      final token = response['token'] as String;
+      final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
+            
+      ref.read(sessionProvider.notifier).login(
+        token: token,
+        role: sessionRole,
+      );
+
       if (mounted) {
         setState(() => _isLoading = false);
-        context.go('/otp', extra: {'phone': phone, 'isWorker': _isWorker});
+        context.go(_isWorker ? '/worker/dashboard' : '/home');
       }
     } catch (e) {
-      // Fallback: proceed to OTP screen even if API is unavailable (dev mode)
       if (mounted) {
         setState(() => _isLoading = false);
-        context.go('/otp', extra: {'phone': phone, 'isWorker': _isWorker});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.emergencyRed),
+        );
       }
     }
   }
@@ -73,8 +149,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               child: Column(
                 children: [
-                  // Logo
-                  Container(
+                   Container(
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
@@ -115,7 +190,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'We\'ll send you a one-time verification code',
+                    'We\'ll send you a secure OTP via Firebase',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 28),
@@ -163,15 +238,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     isLoading: _isLoading,
                     onPressed: _sendOtp,
                   ),
-                  const SizedBox(height: 20),
-                  // Divider
+                  const SizedBox(height: 16),
                   Row(
                     children: [
                       const Expanded(child: Divider()),
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
-                          'Demo Mode',
+                          'OR',
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textHint),
                         ),
                       ),
@@ -179,58 +253,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     ],
                   ),
                   const SizedBox(height: 16),
-                  // Quick demo buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            ref.read(sessionProvider.notifier).login(
-                                  token: 'demo-user-token',
-                                  role: UserRole.user,
-                                  phone: '9876543210',
-                                  name: 'Demo User',
-                                );
-                            context.go('/home');
-                          },
-                          icon: const Icon(Icons.person, size: 18),
-                          label: const Text('Demo User'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            ref.read(sessionProvider.notifier).login(
-                                  token: 'demo-worker-token',
-                                  role: UserRole.worker,
-                                  phone: '9876543211',
-                                  name: 'Demo Worker',
-                                );
-                            context.go('/worker/dashboard');
-                          },
-                          icon: const Icon(Icons.engineering, size: 18),
-                          label: const Text('Demo Worker'),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 20),
-                  // Register link
-                  Center(
-                    child: TextButton(
-                      onPressed: () => context.go('/register'),
-                      child: const Text('New user? Register here'),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  // Footer
-                  Center(
-                    child: Text(
-                      'By continuing, you agree to our Terms of Service\nand Privacy Policy',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
-                      textAlign: TextAlign.center,
-                    ),
+                  PrimaryActionButton(
+                    label: 'Sign in with Google',
+                    icon: Icons.g_mobiledata,
+                    isLoading: _isLoading,
+                    onPressed: _signInWithGoogle,
                   ),
                   const SizedBox(height: 24),
                 ],
