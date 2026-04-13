@@ -12,6 +12,7 @@ if (file("google-services.json").exists()) {
 android {
     namespace = "com.click2fix.mobile"
     compileSdk = flutter.compileSdkVersion
+    ndkVersion = "28.2.13676358"
 
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
