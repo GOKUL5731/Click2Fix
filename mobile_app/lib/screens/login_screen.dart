@@ -17,6 +17,10 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+
   final _apiClient = ApiClient();
   late final _authService = AuthService(_apiClient);
   late final _firebaseAuthService = FirebasePhoneAuthService(_apiClient);
@@ -24,10 +28,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isWorker = false;
   bool _isLoading = false;
   bool _isLoginMode = true; // true = Login, false = Register
+  bool _isEmailMethod = false; // Toggle between Phone and Email
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _nameController.dispose();
     _firebaseAuthService.dispose();
     super.dispose();
   }
@@ -137,10 +145,65 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         },
       );
     } catch (e) {
+    } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Network error. Check your connection.')),
+        );
+      }
+    }
+  }
+
+  Future<void> _submitEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final name = _nameController.text.trim();
+
+    if (email.isEmpty || password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please provide a valid email and 6+ char password')),
+      );
+      return;
+    }
+
+    if (!_isLoginMode && name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please provide your name to register')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final role = _isWorker ? 'worker' : 'user';
+      Map<String, dynamic> backendResponse;
+
+      if (_isLoginMode) {
+        backendResponse = await _firebaseAuthService.signInWithEmail(
+          email: email, password: password, role: role,
+        );
+      } else {
+        backendResponse = await _firebaseAuthService.registerWithEmail(
+          email: email, password: password, role: role, name: name,
+        );
+      }
+
+      final token = backendResponse['token'] as String;
+      final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
+            
+      ref.read(sessionProvider.notifier).login(token: token, role: sessionRole);
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        context.go(_isWorker ? '/worker/dashboard' : '/home');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Authentication failed: $e'), backgroundColor: AppColors.emergencyRed),
         );
       }
     }
@@ -172,10 +235,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       }
     }
-  }
-
-  void _navToEmailLogin() {
-    context.push('/email-login');
   }
 
   @override
@@ -257,29 +316,64 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  // Phone field
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                    decoration: InputDecoration(
-                      labelText: 'Mobile Number',
-                      hintText: '9876543210',
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.only(left: 16, right: 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('🇮🇳', style: TextStyle(fontSize: 20)),
-                            SizedBox(width: 6),
-                            Text('+91', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          ],
-                        ),
+                  const SizedBox(height: 10),
+                  
+                  // Authentication Method Switcher
+                  Center(
+                    child: TextButton(
+                      onPressed: () => setState(() => _isEmailMethod = !_isEmailMethod),
+                      child: Text(
+                        _isEmailMethod ? 'Use Phone Number instead' : 'Use Email & Password instead',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
                       ),
-                      prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
                     ),
                   ),
+                  const SizedBox(height: 16),
+
+                  if (!_isEmailMethod) ...[
+                    // Phone field
+                    TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                      decoration: InputDecoration(
+                        labelText: 'Mobile Number',
+                        hintText: '9876543210',
+                        prefixIcon: const Padding(
+                          padding: EdgeInsets.only(left: 16, right: 8),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text('🇮🇳', style: TextStyle(fontSize: 20)),
+                              SizedBox(width: 6),
+                              Text('+91', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+                            ],
+                          ),
+                        ),
+                        prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                      ),
+                    ),
+                  ] else ...[
+                    if (!_isLoginMode) ...[
+                      TextField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline)),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined)),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
+                    ),
+                  ],
+                  
                   const SizedBox(height: 10),
                   
                   // Register / Login Switcher
@@ -301,12 +395,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   
                   const SizedBox(height: 10),
                   
-                  // Send OTP button
+                  // Submit button
                   PrimaryActionButton(
-                    label: 'Send OTP',
-                    icon: Icons.sms_outlined,
+                    label: _isLoginMode ? 'Login' : 'Register',
+                    icon: _isEmailMethod ? Icons.email_outlined : Icons.sms_outlined,
                     isLoading: _isLoading,
-                    onPressed: _sendOtp,
+                    onPressed: _isEmailMethod ? _submitEmail : _sendOtp,
                   ),
                   
                   const SizedBox(height: 20),
@@ -330,18 +424,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                     icon: Icons.g_mobiledata,
                     isLoading: _isLoading,
                     onPressed: _signInWithGoogle,
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  OutlinedButton.icon(
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size(double.infinity, 54),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-                    ),
-                    label: const Text('Continue with Email'),
-                    icon: const Icon(Icons.email_outlined),
-                    onPressed: _navToEmailLogin,
                   ),
                   
                   const SizedBox(height: 40),
