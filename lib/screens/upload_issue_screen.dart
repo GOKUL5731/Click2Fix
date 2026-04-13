@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -27,7 +28,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
 
   // Form state
   final _descriptionController = TextEditingController();
-  Uint8List? _imageBytes;
+  String? _imagePath;
   String? _voicePath;
   double? _latitude;
   double? _longitude;
@@ -41,6 +42,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
   String? _aiCategory;
   double? _aiConfidence;
   String? _otpToken;
+  final bool _showOtpDialog = false;
   final _otpController = TextEditingController();
 
   // Animation
@@ -98,14 +100,13 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
     try {
       final picked = await _imagePicker.pickImage(
         source: source,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 72,
+        maxWidth: 1920,
+        maxHeight: 1920,
+        imageQuality: 85,
       );
       if (picked != null) {
-        final bytes = await picked.readAsBytes();
         setState(() {
-          _imageBytes = bytes;
+          _imagePath = picked.path;
           _isAnalyzing = true;
           _aiDescription = null;
           _aiCategory = null;
@@ -117,11 +118,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
           final client = ref.read(apiClientProvider);
           client.setToken(session.token);
           final issueService = IssueService(client);
-          final result = await issueService.analyzeImageFile(
-            imageBytes: bytes,
-            imagePath: kIsWeb ? null : picked.path,
-            filename: picked.name.isNotEmpty ? picked.name : 'issue_image.jpg',
-          );
+          final result = await issueService.analyzeImageFile(picked.path);
           if (mounted) {
             setState(() {
               _isAnalyzing = false;
@@ -279,7 +276,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
   }
 
   Future<void> _initiateSubmission() async {
-    if (_imageBytes == null) {
+    if (_imagePath == null) {
       _showSnackBar('Please take a photo or select an image first');
       return;
     }
@@ -318,8 +315,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
         latitude: _latitude,
         longitude: _longitude,
         isEmergency: _isEmergency,
-        imageBytes: _imageBytes,
-        imageFilename: 'issue_image.jpg',
+        imagePath: _imagePath,
         voicePath: _voicePath,
         uploadToken: _otpToken,
       );
@@ -434,24 +430,46 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
         Text('📸 Capture the Problem',
             style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: cs.onSurface)),
         const SizedBox(height: 8),
-        if (_imageBytes != null)
+        if (_imagePath != null)
           Stack(
             children: [
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.memory(
-                  _imageBytes!,
-                  width: double.infinity,
-                  height: 220,
-                  fit: BoxFit.cover,
-                ),
+                child: kIsWeb
+                    ? FutureBuilder<Uint8List>(
+                        future: File(_imagePath!).readAsBytes(),
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData) {
+                            return Image.memory(
+                              snapshot.data!,
+                              width: double.infinity,
+                              height: 220,
+                              fit: BoxFit.cover,
+                            );
+                          }
+                          return Container(
+                            width: double.infinity,
+                            height: 220,
+                            color: Colors.grey[300],
+                            child: const Center(
+                              child: CircularProgressIndicator(),
+                            ),
+                          );
+                        },
+                      )
+                    : Image.file(
+                        File(_imagePath!),
+                        width: double.infinity,
+                        height: 220,
+                        fit: BoxFit.cover,
+                      ),
               ),
               Positioned(
                 top: 8,
                 right: 8,
                 child: IconButton.filled(
                   onPressed: () => setState(() {
-                    _imageBytes = null;
+                    _imagePath = null;
                     _aiDescription = null;
                     _aiCategory = null;
                   }),
