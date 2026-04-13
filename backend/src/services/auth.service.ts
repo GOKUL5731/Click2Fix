@@ -204,13 +204,13 @@ export async function register(input: RegisterInput) {
     }
   } else {
     await query(
-      `INSERT INTO users (name, phone, email, password_hash)
-       VALUES ($1, $2, $3, $4)
+      `INSERT INTO users (name, phone, email, password_hash, role)
+       VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (phone) DO UPDATE
        SET name = COALESCE(EXCLUDED.name, users.name),
            email = COALESCE(EXCLUDED.email, users.email),
            password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash)`,
-      [input.name ?? null, input.phone, input.email ?? null, passwordHash]
+      [input.name ?? null, input.phone, input.email ?? null, passwordHash, 'user']
     );
   }
 
@@ -249,7 +249,30 @@ export async function login(input: LoginInput) {
   }
 
   if (!input.phone) {
-    throw httpError(400, 'Phone number is required');
+    if (input.email && input.password) {
+      const table = input.role === 'worker' ? 'workers' : 'users';
+      
+      const result = await query<{ id: string; email: string; password_hash: string; phone: string }>(
+        `SELECT id, email, password_hash, phone FROM ${table} WHERE email = $1`,
+        [input.email]
+      );
+      
+      const account = result.rows[0];
+      if (!account || !account.password_hash || !(await bcrypt.compare(input.password, account.password_hash))) {
+        throw httpError(401, 'Invalid email or password');
+      }
+
+      const token = signToken({
+        sub: account.id,
+        role: input.role,
+        phone: account.phone,
+        email: account.email,
+        deviceId: input.deviceId
+      });
+
+      return { token, role: input.role, accountId: account.id };
+    }
+    throw httpError(400, 'Phone number or email/password is required');
   }
 
   const table = input.role === 'worker' ? 'workers' : 'users';
@@ -401,14 +424,14 @@ export async function firebaseLogin(input: FirebaseLoginInput) {
   }
 
   const userResult = await query<{ id: string; phone: string; email: string | null }>(
-    `INSERT INTO users (name, phone, email, profile_photo)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (name, phone, email, profile_image, role)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (phone) DO UPDATE
      SET name = COALESCE(EXCLUDED.name, users.name),
          email = COALESCE(EXCLUDED.email, users.email),
-         profile_photo = COALESCE(EXCLUDED.profile_photo, users.profile_photo)
+         profile_image = COALESCE(EXCLUDED.profile_image, users.profile_image)
      RETURNING id, phone, email`,
-    [input.name ?? identity.name ?? null, phone, input.email ?? identity.email ?? null, identity.picture ?? null]
+    [input.name ?? identity.name ?? null, phone, input.email ?? identity.email ?? null, identity.picture ?? null, 'user']
   );
 
   const user = userResult.rows[0];
@@ -472,14 +495,14 @@ export async function googleLogin(input: GoogleLoginInput) {
   }
 
   const userResult = await query<{ id: string; name: string; email: string }>(
-    `INSERT INTO users (name, phone, email, profile_photo)
-     VALUES ($1, $2, $3, $4)
+    `INSERT INTO users (name, phone, email, profile_image, role)
+     VALUES ($1, $2, $3, $4, $5)
      ON CONFLICT (phone) DO UPDATE
      SET name = COALESCE(EXCLUDED.name, users.name),
          email = COALESCE(EXCLUDED.email, users.email),
-         profile_photo = COALESCE(EXCLUDED.profile_photo, users.profile_photo)
+         profile_image = COALESCE(EXCLUDED.profile_image, users.profile_image)
      RETURNING id, name, email`,
-    [input.name ?? null, phone, input.email, input.photoUrl ?? null]
+    [input.name ?? null, phone, input.email, input.photoUrl ?? null, 'user']
   );
 
   const user = userResult.rows[0];

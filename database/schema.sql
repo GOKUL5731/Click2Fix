@@ -36,7 +36,8 @@ CREATE TABLE IF NOT EXISTS users (
   phone VARCHAR(20) UNIQUE NOT NULL,
   email VARCHAR(180) UNIQUE,
   password_hash TEXT,
-  profile_photo TEXT,
+  role user_role NOT NULL DEFAULT 'user',
+  profile_image TEXT,
   face_verified BOOLEAN NOT NULL DEFAULT FALSE,
   preferred_language VARCHAR(10) NOT NULL DEFAULT 'en',
   device_id VARCHAR(180),
@@ -359,5 +360,19 @@ END $$;
 
 DO $$ BEGIN
   CREATE TRIGGER trg_device_tokens_updated_at BEFORE UPDATE ON device_tokens FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
+
+CREATE TABLE IF NOT EXISTS booking_locations (
+  booking_id UUID PRIMARY KEY REFERENCES bookings(id) ON DELETE CASCADE,
+  user_lat NUMERIC(10,7),
+  user_lng NUMERIC(10,7),
+  worker_lat NUMERIC(10,7),
+  worker_lng NUMERIC(10,7),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DO $$ BEGIN
+  CREATE TRIGGER trg_booking_locations_updated_at BEFORE UPDATE ON booking_locations FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;

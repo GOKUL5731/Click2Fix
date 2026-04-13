@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/socket_service.dart';
 
 enum UserRole { user, worker, none }
 
@@ -50,6 +51,8 @@ class SessionNotifier extends StateNotifier<Session> {
         phone: prefs.getString(_phoneKey),
         name: prefs.getString(_nameKey),
       );
+      
+      SocketService().connect(token);
     } catch (e) {
       debugPrint('Failed to restore session: $e');
     }
@@ -58,11 +61,13 @@ class SessionNotifier extends StateNotifier<Session> {
   void login({required String token, required UserRole role, String? phone, String? name}) {
     state = Session(token: token, role: role, phone: phone, name: name);
     _persistSession(token, role, phone, name);
+    SocketService().connect(token);
   }
 
   void logout() {
     state = const Session();
     _clearSession();
+    SocketService().disconnect();
   }
 
   Future<void> _persistSession(String token, UserRole role, String? phone, String? name) async {

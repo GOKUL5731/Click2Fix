@@ -9,6 +9,9 @@ import { paymentRoutes } from './payment.routes';
 import { reviewRoutes } from './review.routes';
 import { workerRoutes } from './worker.routes';
 import { versionRoutes } from './version.routes';
+import { chatRoutes } from './chat.routes';
+import { locationRoutes } from './location.routes';
+import { callRoutes } from './call.routes';
 
 export const routes = Router();
 
@@ -22,3 +25,6 @@ routes.use('/payment', paymentRoutes);
 routes.use('/review', reviewRoutes);
 routes.use('/admin', adminRoutes);
 routes.use('/app', versionRoutes);
+routes.use('/chat', chatRoutes);
+routes.use('/location', locationRoutes);
+routes.use('/call', callRoutes);

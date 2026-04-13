@@ -33,6 +33,9 @@ export const config = {
   // OpenAI
   openaiApiKey: process.env.OPENAI_API_KEY ?? '',
 
+  // Gemini
+  googleGeminiApiKey: process.env.GOOGLE_GEMINI_API_KEY ?? '',
+
   // Twilio SMS
   twilioAccountSid: process.env.TWILIO_ACCOUNT_SID ?? '',
   twilioAuthToken: process.env.TWILIO_AUTH_TOKEN ?? '',

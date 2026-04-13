@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../config/app_theme.dart';
+import '../models/chat_message.dart';
+import '../services/api_client.dart';
+import '../services/chat_service.dart';
+import '../services/socket_service.dart';
 
 class ChatScreen extends StatefulWidget {
   const ChatScreen({super.key});
@@ -8,27 +12,63 @@ class ChatScreen extends StatefulWidget {
   State<ChatScreen> createState() => _ChatScreenState();
 }
 
-class _ChatScreenState extends State<ChatScreen> {
   final _msgController = TextEditingController();
-  final _messages = <({String text, bool isMe, String time})>[
-    (text: 'Hi, I\'m on my way to your location.', isMe: false, time: '2:30 PM'),
-    (text: 'Great! Please come to the main entrance.', isMe: true, time: '2:31 PM'),
-    (text: 'Sure, I\'ll be there in about 15 minutes.', isMe: false, time: '2:31 PM'),
-    (text: 'Can you bring extra washers? The pipe is old.', isMe: true, time: '2:33 PM'),
-    (text: 'Yes, I have all supplies needed. No worries! 👍', isMe: false, time: '2:34 PM'),
-  ];
+  bool _isLoading = true;
+  final _messages = <ChatMessage>[];
 
-  void _sendMessage() {
+  @override
+  void initState() {
+    super.initState();
+    _loadMessages();
+    SocketService().joinBooking('hardcoded_booking_id_for_now');
+    SocketService().onMessage((data) {
+      if (!mounted) return;
+      setState(() {
+        _messages.add(ChatMessage.fromJson(data));
+      });
+    });
+  }
+
+  Future<void> _loadMessages() async {
+    try {
+      final msgs = await ChatService(ApiClient()).getMessages('hardcoded_booking_id_for_now');
+      if (mounted) setState(() {
+        _messages.addAll(msgs);
+        _isLoading = false;
+      });
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _sendMessage() async {
     final text = _msgController.text.trim();
     if (text.isEmpty) return;
+    
+    _msgController.clear();
+    
+    // Optimistic UI
+    final tempMsg = ChatMessage(
+      id: DateTime.now().toString(),
+      bookingId: 'hardcoded_booking_id_for_now',
+      senderId: 'me',
+      senderRole: 'user',
+      message: text,
+      createdAt: DateTime.now(),
+    );
     setState(() {
-      _messages.add((text: text, isMe: true, time: TimeOfDay.now().format(context)));
-      _msgController.clear();
+      _messages.add(tempMsg);
     });
-    // Auto reply
-    Future.delayed(const Duration(seconds: 1), () {
-      if (mounted) setState(() => _messages.add((text: 'Got it! 👍', isMe: false, time: TimeOfDay.now().format(context))));
-    });
+
+    try {
+      await ChatService(ApiClient()).sendMessage('hardcoded_booking_id_for_now', text);
+      SocketService().sendMessage('hardcoded_booking_id_for_now', text);
+    } catch (e) {
+      // Revert if failed
+      setState(() {
+        _messages.remove(tempMsg);
+      });
+    }
   }
 
   @override
@@ -53,32 +93,35 @@ class _ChatScreenState extends State<ChatScreen> {
       ),
       body: Column(children: [
         Expanded(
-          child: ListView.builder(
-            reverse: false, padding: const EdgeInsets.all(16), itemCount: _messages.length,
-            itemBuilder: (context, index) {
-              final msg = _messages[index];
-              return Align(
-                alignment: msg.isMe ? Alignment.centerRight : Alignment.centerLeft,
-                child: Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
-                  decoration: BoxDecoration(
-                    color: msg.isMe ? AppColors.primaryBlue : (isDark ? AppColors.cardDark : AppColors.backgroundLight),
-                    borderRadius: BorderRadius.only(
-                      topLeft: const Radius.circular(16), topRight: const Radius.circular(16),
-                      bottomLeft: Radius.circular(msg.isMe ? 16 : 4), bottomRight: Radius.circular(msg.isMe ? 4 : 16),
-                    ),
-                  ),
-                  child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(msg.text, style: TextStyle(color: msg.isMe ? Colors.white : null, fontSize: 14)),
-                    const SizedBox(height: 4),
-                    Text(msg.time, style: TextStyle(fontSize: 10, color: msg.isMe ? Colors.white60 : AppColors.textHint)),
-                  ]),
+          child: _isLoading 
+              ? const Center(child: CircularProgressIndicator())
+              : ListView.builder(
+                  reverse: false, padding: const EdgeInsets.all(16), itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final msg = _messages[index];
+                    final isMe = msg.senderRole == 'user'; // Assume this is user app
+                    return Align(
+                      alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                        constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.7),
+                        decoration: BoxDecoration(
+                          color: isMe ? AppColors.primaryBlue : (isDark ? AppColors.cardDark : AppColors.backgroundLight),
+                          borderRadius: BorderRadius.only(
+                            topLeft: const Radius.circular(16), topRight: const Radius.circular(16),
+                            bottomLeft: Radius.circular(isMe ? 16 : 4), bottomRight: Radius.circular(isMe ? 4 : 16),
+                          ),
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                          Text(msg.message, style: TextStyle(color: isMe ? Colors.white : null, fontSize: 14)),
+                          const SizedBox(height: 4),
+                          Text('${msg.createdAt.hour}:${msg.createdAt.minute}', style: TextStyle(fontSize: 10, color: isMe ? Colors.white60 : AppColors.textHint)),
+                        ]),
+                      ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
         ),
         // Input
         Container(
