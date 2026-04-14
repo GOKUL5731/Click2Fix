@@ -153,9 +153,12 @@ class FirebasePhoneAuthService {
   Future<Map<String, dynamic>> signInWithGoogle({
     required String role,
   }) async {
-    final GoogleSignIn googleSignIn = GoogleSignIn(scopes: ['email', 'profile']);
+    final GoogleSignIn googleSignIn = GoogleSignIn(
+      serverClientId: '926338625536-gbuohg1dtq81n42fnmhefqc5qno94n62.apps.googleusercontent.com',
+      scopes: ['email', 'profile'],
+    );
     final googleUser = await googleSignIn.signIn();
-    if (googleUser == null) throw Exception('Google Sign-In cancelled.');
+    if (googleUser == null) return {};
 
     final googleAuth = await googleUser.authentication;
     final credential = GoogleAuthProvider.credential(

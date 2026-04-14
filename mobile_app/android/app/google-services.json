@@ -12,7 +12,12 @@
           "package_name": "com.click2fix.mobile"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "926338625536-gbuohg1dtq81n42fnmhefqc5qno94n62.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyAY-sGfre9XqYzAmFagvS7e_dt8eBft5Rc"

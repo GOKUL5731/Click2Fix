@@ -3,7 +3,10 @@ class AppConfig {
   static const tagline = 'Click the problem. Fix it instantly.';
 
   /// REST base URL — all API calls go to /api/*
-  static const String apiBaseUrl = 'https://click2fix-backend.onrender.com/api';
+  static const apiBaseUrl = String.fromEnvironment(
+    'API_BASE_URL',
+    defaultValue: 'https://click2fix-backend.onrender.com/api',
+  );
 
   /// WebSocket / Socket.IO URL (no /api suffix)
   static const String socketUrl = 'https://click2fix-backend.onrender.com';
