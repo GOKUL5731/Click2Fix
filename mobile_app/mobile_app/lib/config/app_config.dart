@@ -11,7 +11,7 @@ class AppConfig {
   /// Development: http://localhost:8080
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://click2fix-backend.onrender.com',
+    defaultValue: 'https://click2fix-backend.onrender.com/api',
   );
 
   static const socketUrl = String.fromEnvironment(

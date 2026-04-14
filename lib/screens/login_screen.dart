@@ -74,6 +74,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
       setState(() => _isLoading = false);
       router.go(_isWorker ? '/worker/dashboard' : '/home');
+    } on GoogleSignInException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      if (e.code == GoogleSignInExceptionCode.canceled) return;
+      _showError('Google sign-in failed: $e');
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);

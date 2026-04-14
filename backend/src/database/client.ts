@@ -3,16 +3,28 @@ import Redis from 'ioredis';
 import { config } from '../config';
 
 export const pool = new Pool({
-  connectionString: config.databaseUrl.replace('sslmode=require', ''),
-  ssl: config.nodeEnv === 'production' ? { rejectUnauthorized: false } : { rejectUnauthorized: false },
+  connectionString: config.databaseUrl,
+  ssl: config.nodeEnv === 'production' ? { rejectUnauthorized: false } : undefined,
   max: 20,
-  idleTimeoutMillis: 30000
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
+pool.on('connect', () => {
+  if (config.nodeEnv !== 'test') {
+    console.log('Database pool connected successfully');
+  }
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle database client', err);
 });
 
 export const redis = new Redis(config.redisUrl, {
   lazyConnect: true,
   maxRetriesPerRequest: 2,
-  enableOfflineQueue: false
+  enableOfflineQueue: false,
+  retryStrategy: (times) => Math.min(times * 50, 2000),
 });
 
 redis.on('error', (error) => {

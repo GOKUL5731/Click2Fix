@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
@@ -153,6 +154,11 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
 
       setState(() => _isLoading = false);
       router.go(_isWorker ? '/worker/dashboard' : '/home');
+    } on GoogleSignInException catch (e) {
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      if (e.code == GoogleSignInExceptionCode.canceled) return;
+      _showError('Google sign-in failed: $e');
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
