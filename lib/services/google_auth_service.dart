@@ -38,6 +38,12 @@ class GoogleAuthService {
       );
 
       return await FirebaseAuth.instance.signInWithCredential(credential);
+    } on GoogleSignInException catch (e) {
+      if (e.code == GoogleSignInExceptionCode.canceled) {
+        return null;
+      }
+      debugPrint('Google Sign in Exception: $e');
+      rethrow;
     } catch (e) {
       debugPrint('Error during Google Sign in: $e');
       rethrow;
