@@ -36,14 +36,17 @@ export function createApp() {
   app.use('/uploads', express.static(config.uploadDir));
 
   // Health check with DB status for Render startup probe
-  app.get('/health', async (_req, res) => {
+  const handleHealth = async (_req: express.Request, res: express.Response) => {
     try {
       const db = await healthCheck();
       res.json({ status: 'ok', service: 'click2fix-backend', database: db.database, timestamp: new Date().toISOString() });
     } catch (err) {
       res.status(503).json({ status: 'degraded', service: 'click2fix-backend', error: String(err) });
     }
-  });
+  };
+  app.get('/health', handleHealth);
+  app.get('/api/health', handleHealth);
+
 
   // Root GET for health and info
   app.get('/', (_req, res) => {

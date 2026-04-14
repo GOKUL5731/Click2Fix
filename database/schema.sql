@@ -61,6 +61,8 @@ CREATE TABLE IF NOT EXISTS workers (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name VARCHAR(120) NOT NULL,
   phone VARCHAR(20) UNIQUE NOT NULL,
+  email VARCHAR(180) UNIQUE,
+  password_hash TEXT,
   category VARCHAR(80),
   experience INTEGER NOT NULL DEFAULT 0,
   aadhaar_number TEXT,

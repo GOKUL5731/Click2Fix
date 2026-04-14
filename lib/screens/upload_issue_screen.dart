@@ -118,7 +118,7 @@ class _UploadIssueScreenState extends ConsumerState<UploadIssueScreen>
           final client = ref.read(apiClientProvider);
           client.setToken(session.token);
           final issueService = IssueService(client);
-          final result = await issueService.analyzeImageFile(picked.path);
+          final result = await issueService.analyzeImageFile(imagePath: picked.path);
           if (mounted) {
             setState(() {
               _isAnalyzing = false;

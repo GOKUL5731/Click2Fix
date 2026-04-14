@@ -156,7 +156,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     } catch (e) {
       if (!mounted) return;
       setState(() => _isLoading = false);
-      _showError(e is ApiException ? e.message : 'Google sign-in failed: \${e.toString()}');
+      _showError(e is ApiException ? e.message : 'Google sign-in failed: $e');
     }
   }
 

@@ -60,6 +60,30 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
     });
   }
 
+  Future<void> _resendOtp() async {
+    final role = widget.isWorker ? 'worker' : 'user';
+    final client = ref.read(apiClientProvider);
+    final authService = AuthService(client);
+    try {
+      await authService.loginWithPhone(widget.phone ?? '', role: role);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('OTP resent successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e is ApiException ? e.message : 'Failed to resend OTP'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+    _startResendTimer();
+  }
+
   String get _otp => _controllers.map((c) => c.text).join();
 
   Future<void> _verifyOtp() async {
@@ -109,19 +133,12 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
       context.go(widget.isWorker ? '/worker/dashboard' : '/home');
     } catch (e) {
       if (!mounted) return;
-      // Allow fallback code '123456' for local testing
-      if (_firebaseVerificationId == null && _otp == '123456') {
-        ref.read(sessionProvider.notifier).login(
-              token: 'dev-token',
-              role: sessionRole,
-              phone: widget.phone,
-            );
-        context.go(widget.isWorker ? '/worker/dashboard' : '/home');
-        return;
-      }
       setState(() => _isLoading = false);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Invalid OTP'), backgroundColor: AppColors.error),
+        SnackBar(
+          content: Text(e is ApiException ? e.message : 'Invalid or expired OTP. Please try again.'),
+          backgroundColor: AppColors.error,
+        ),
       );
     }
   }
@@ -218,7 +235,7 @@ class _OtpScreenState extends ConsumerState<OtpScreen> {
               children: [
                 const Text('Didn\'t receive code?', style: TextStyle(color: AppColors.textLight)),
                 TextButton(
-                  onPressed: _canResend ? _startResendTimer : null,
+                  onPressed: _canResend ? _resendOtp : null,
                   child: Text(
                     _canResend ? 'Resend' : 'Resend in ${_resendSeconds}s',
                     style: TextStyle(

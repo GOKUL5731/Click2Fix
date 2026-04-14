@@ -6,36 +6,32 @@ import 'api_client.dart';
 
 class GoogleAuthService {
   final ApiClient _client;
-  
+
   GoogleAuthService(this._client);
 
-  bool _initialized = false;
+  final GoogleSignIn _googleSignIn = GoogleSignIn(
+    scopes: ['email', 'profile'],
+  );
 
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      if (!_initialized) {
-        await GoogleSignIn.instance.initialize();
-        _initialized = true;
-      }
-      
-      final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate(
-        scopeHint: const ['email', 'profile'],
-      );
-      
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+
       if (googleUser == null) {
-        return null;
+        return null; // User cancelled
       }
 
-      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final GoogleSignInAuthentication googleAuth =
+          await googleUser.authentication;
 
       final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: (googleAuth as dynamic).accessToken,
+        accessToken: googleAuth.accessToken,
         idToken: googleAuth.idToken,
       );
 
       return await FirebaseAuth.instance.signInWithCredential(credential);
     } catch (e) {
-      debugPrint('Error during Google Sign in: \$e');
+      debugPrint('Error during Google Sign in: $e');
       rethrow;
     }
   }
@@ -60,17 +56,17 @@ class GoogleAuthService {
 
       return data;
     } catch (e) {
-      debugPrint('Error sending Google login to backend: \$e');
+      debugPrint('Error sending Google login to backend: $e');
       rethrow;
     }
   }
 
   Future<void> signOut() async {
     try {
-      await GoogleSignIn.instance.signOut();
+      await _googleSignIn.signOut();
       await FirebaseAuth.instance.signOut();
     } catch (e) {
-      debugPrint('Google Sign out error: \$e');
+      debugPrint('Google Sign out error: $e');
     }
   }
 }

@@ -515,5 +515,5 @@ export async function googleLogin(input: GoogleLoginInput) {
     firebaseUid: input.firebaseUid
   });
 
-  return { token, user: { id: user.id, name: user.name, email: user.email, role: 'customer' } };
+  return { token, user: { id: user.id, name: user.name, email: user.email, role: 'user' } };
 }

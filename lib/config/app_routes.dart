@@ -1,4 +1,4 @@
-﻿import 'package:go_router/go_router.dart';
+import 'package:go_router/go_router.dart';
 
 import '../screens/splash_screen.dart';
 import '../screens/onboarding_screen.dart';
@@ -54,7 +54,13 @@ final appRouter = GoRouter(
     GoRoute(path: '/worker-detail', builder: (context, state) => const WorkerDetailScreen()),
     GoRoute(path: '/booking-confirmation', builder: (context, state) => const BookingConfirmationScreen()),
     GoRoute(path: '/tracking', builder: (context, state) => const LiveTrackingScreen()),
-    GoRoute(path: '/chat', builder: (context, state) => const ChatScreen()),
+    GoRoute(
+      path: '/chat',
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>?;
+        return ChatScreen(bookingId: extra?['bookingId'] as String? ?? '');
+      },
+    ),
     GoRoute(path: '/payment', builder: (context, state) => const PaymentScreen()),
     GoRoute(path: '/review', builder: (context, state) => const ReviewScreen()),
     GoRoute(path: '/history', builder: (context, state) => const BookingHistoryScreen()),
