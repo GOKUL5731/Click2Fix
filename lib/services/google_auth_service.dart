@@ -9,13 +9,19 @@ class GoogleAuthService {
 
   GoogleAuthService(this._client);
 
-  final GoogleSignIn _googleSignIn = GoogleSignIn(
-    scopes: ['email', 'profile'],
-  );
+  bool _initialized = false;
+
+  Future<void> _ensureInitialized() async {
+    if (!_initialized) {
+      await GoogleSignIn.instance.initialize();
+      _initialized = true;
+    }
+  }
 
   Future<UserCredential?> signInWithGoogle() async {
     try {
-      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      await _ensureInitialized();
+      final GoogleSignInAccount? googleUser = await GoogleSignIn.instance.authenticate();
 
       if (googleUser == null) {
         return null; // User cancelled
@@ -25,7 +31,7 @@ class GoogleAuthService {
           await googleUser.authentication;
 
       final OAuthCredential credential = GoogleAuthProvider.credential(
-        accessToken: googleAuth.accessToken,
+        accessToken: null, // As of 7.2.0 accessToken moved to authorizationForScopes but idToken is sufficient for Firebase
         idToken: googleAuth.idToken,
       );
 
@@ -63,7 +69,8 @@ class GoogleAuthService {
 
   Future<void> signOut() async {
     try {
-      await _googleSignIn.signOut();
+      await _ensureInitialized();
+      await GoogleSignIn.instance.signOut();
       await FirebaseAuth.instance.signOut();
     } catch (e) {
       debugPrint('Google Sign out error: $e');

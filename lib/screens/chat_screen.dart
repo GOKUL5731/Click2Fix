@@ -90,7 +90,6 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
 
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final session = ref.watch(sessionProvider);
-    final myId = session.user?.id ?? '';
 
     return Scaffold(
       appBar: AppBar(
@@ -116,7 +115,7 @@ class _ChatScreenState extends ConsumerState<ChatScreen> {
                 itemCount: _messages.length,
                 itemBuilder: (context, index) {
                   final msg = _messages[index];
-                  final isMe = msg['sender_id'] == myId;
+                  final isMe = msg['sender_role'] == (session.isWorker ? 'worker' : 'user');
                   
                   return Align(
                     alignment: isMe ? Alignment.centerRight : Alignment.centerLeft,
