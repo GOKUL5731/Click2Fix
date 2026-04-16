@@ -8,6 +8,7 @@ import '../config/app_config.dart';
 import '../config/app_theme.dart';
 import '../providers/session_provider.dart';
 import '../services/api_client.dart';
+import '../services/auth_service.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -32,12 +33,30 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     // 1. Check for app update
     await _checkVersion();
 
-    // 2. Restore session (SessionNotifier already restores it, just wait a tick)
-    await Future.delayed(const Duration(milliseconds: 200));
+    // 2. Restore and verify session
+    setState(() => _statusText = 'Verifying session…');
+    final authService = AuthService(ApiClient());
+    final sessionData = await authService.restoreSession();
 
     if (!mounted) return;
-    final session = ref.read(sessionProvider);
-    _navigate(session);
+
+    if (sessionData != null) {
+      final roleStr = sessionData['role'];
+      UserRole role = UserRole.none;
+      if (roleStr == 'user') role = UserRole.user;
+      if (roleStr == 'worker') role = UserRole.worker;
+
+      ref.read(sessionProvider.notifier).login(
+            token: sessionData['token']!,
+            role: role,
+            phone: sessionData['phone'],
+            email: sessionData['email'] ?? sessionData['email'], // Backward compatibility
+            name: sessionData['name'],
+          );
+      _navigate(ref.read(sessionProvider));
+    } else {
+      _navigate(const Session());
+    }
   }
 
   Future<void> _checkVersion() async {

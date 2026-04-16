@@ -13,20 +13,70 @@ class AuthService {
   /// Register a new user or worker
   Future<Map<String, dynamic>> register({
     required String role,
-    required String phone,
+    required String email,
+    required String password,
     String? name,
-    String? email,
+    String? phone,
     String? category,
     int? experience,
   }) async {
     final response = await _client.post('/auth/register', {
       'role': role,
-      'phone': phone,
+      'email': email,
+      'password': password,
       if (name != null) 'name': name,
-      if (email != null) 'email': email,
+      if (phone != null) 'phone': phone,
       if (category != null) 'category': category,
       if (experience != null) 'experience': experience,
     });
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Login with email and password
+  Future<Map<String, dynamic>> loginWithEmail({
+    required String email,
+    required String password,
+    required String role,
+  }) async {
+    final response = await _client.post('/auth/login', {
+      'email': email,
+      'password': password,
+      'role': role,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Login with Google
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String firebaseIdToken,
+    required String role,
+    required String email,
+    String? name,
+    String? photoUrl,
+    required String firebaseUid,
+  }) async {
+    final response = await _client.post('/auth/google-login', {
+      'role': role,
+      'email': email,
+      'name': name,
+      'photoUrl': photoUrl,
+      'firebaseUid': firebaseUid,
+      'idToken': firebaseIdToken, // For backend verification
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Forgot password
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    final response = await _client.post('/auth/forgot-password', {
+      'email': email,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Get current user profile
+  Future<Map<String, dynamic>> getMe() async {
+    final response = await _client.get('/auth/me');
     return response.data as Map<String, dynamic>;
   }
 
@@ -90,19 +140,31 @@ class AuthService {
     _client.setToken(token);
   }
 
-  /// Restore session from local storage
+  /// Restore session from local storage and verify it
   Future<Map<String, String?>?> restoreSession() async {
     final prefs = await SharedPreferences.getInstance();
     final token = prefs.getString(_tokenKey);
-    if (token == null) return null;
+    final role = prefs.getString(_roleKey);
+    
+    if (token == null || role == null) return null;
 
     _client.setToken(token);
-    return {
-      'token': token,
-      'role': prefs.getString(_roleKey),
-      'phone': prefs.getString(_phoneKey),
-      'name': prefs.getString(_nameKey),
-    };
+    
+    try {
+      // Verify token with backend
+      await getMe();
+      
+      return {
+        'token': token,
+        'role': role,
+        'phone': prefs.getString(_phoneKey),
+        'name': prefs.getString(_nameKey),
+      };
+    } catch (e) {
+      // Token invalid or expired
+      await logout();
+      return null;
+    }
   }
 
   /// Clear session

@@ -37,3 +37,12 @@ export const logout = asyncHandler(async (_req: Request, res: Response) => {
 export const googleLogin = asyncHandler(async (req: Request, res: Response) => {
   res.json(await authService.googleLogin(req.body));
 });
+
+export const forgotPassword = asyncHandler(async (req: Request, res: Response) => {
+  res.json(await authService.forgotPassword(req.body));
+});
+
+export const getMe = asyncHandler(async (req: Request, res: Response) => {
+  const { sub, role } = (req as any).auth;
+  res.json(await authService.getMe(sub, role));
+});

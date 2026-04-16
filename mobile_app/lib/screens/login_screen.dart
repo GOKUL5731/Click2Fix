@@ -28,7 +28,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   bool _isWorker = false;
   bool _isLoading = false;
   bool _isLoginMode = true; // true = Login, false = Register
-  bool _isEmailMethod = false; // Toggle between Phone and Email
+  bool _isEmailMethod = true; // Set to true as default
 
   @override
   void dispose() {
@@ -41,115 +41,34 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
 
   Future<void> _sendOtp() async {
-    final phone = _phoneController.text.trim();
-    if (phone.length < 10) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Phone login temporarily unavailable. Please use Email or Google login.')),
+    );
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid 10-digit phone number')),
+        const SnackBar(content: Text('Please enter your email to reset password')),
       );
       return;
     }
-    
-    final countryCode = phone.startsWith('+') ? '' : '+91';
-    final fullPhone = '$countryCode$phone';
 
     setState(() => _isLoading = true);
-
     try {
-      // Pre-check user existence to guide them properly
-      final checkRes = await _authService.checkUser(phone: fullPhone);
-      final exists = checkRes['exists'] == true;
-
-      // Prevent sending OTP if they are on the wrong flow to save SMS costs
-      if (_isLoginMode && !exists) {
+      await _authService.forgotPassword(email);
+      if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account not found. Please register first.')),
+          const SnackBar(content: Text('Password reset email sent')),
         );
-        return;
-      } else if (!_isLoginMode && exists) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Account already exists. Please login.')),
-        );
-        return;
       }
-
-      await _firebaseAuthService.sendOtp(
-        fullPhone,
-        onCodeSent: (verificationId) {
-          if (mounted) {
-            setState(() => _isLoading = false);
-            context.go('/otp', extra: {
-              'phone': fullPhone,
-              'isWorker': _isWorker,
-              'isLoginMode': _isLoginMode,
-              'verificationId': verificationId,
-              'firebaseAuthService': _firebaseAuthService,
-            });
-          }
-        },
-        onAutoVerified: (credential) async {
-          try {
-            final result = await _firebaseAuthService.signInWithCredential(credential);
-            
-            if (!_isLoginMode) {
-              // Registration: redirect to complete profile
-              if (mounted) {
-                setState(() => _isLoading = false);
-                context.go('/register-profile', extra: {
-                  'phone': result.phoneNumber ?? fullPhone,
-                  'isWorker': _isWorker,
-                  'firebaseToken': result.firebaseIdToken,
-                });
-              }
-              return;
-            }
-
-            // Login: exchange token directly
-            final role = _isWorker ? 'worker' : 'user';
-            final backendResponse = await _firebaseAuthService.exchangeForBackendJwt(
-              firebaseIdToken: result.firebaseIdToken,
-              role: role,
-              phone: result.phoneNumber,
-            );
-            
-            final token = backendResponse['token'] as String;
-            final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
-            
-            ref.read(sessionProvider.notifier).login(
-              token: token,
-              role: sessionRole,
-              phone: result.phoneNumber,
-            );
-
-            if (mounted) {
-              setState(() => _isLoading = false);
-              context.go(_isWorker ? '/worker/dashboard' : '/home');
-            }
-          } catch (e) {
-            if (mounted) {
-              setState(() => _isLoading = false);
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('Verification failed: $e')),
-              );
-            }
-          }
-        },
-        onError: (msg) {
-          if (mounted) {
-            setState(() => _isLoading = false);
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(msg), backgroundColor: AppColors.emergencyRed),
-            );
-          }
-        },
-      );
-    } catch (e) {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Network error. Check your connection.')),
+          SnackBar(content: Text(e.toString())),
         );
       }
     }
@@ -178,49 +97,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
 
     try {
       final role = _isWorker ? 'worker' : 'user';
-      Map<String, dynamic> backendResponse;
+      Map<String, dynamic> response;
 
       if (_isLoginMode) {
-        backendResponse = await _firebaseAuthService.signInWithEmail(
-          email: email, password: password, role: role,
+        response = await _authService.loginWithEmail(
+          email: email, 
+          password: password, 
+          role: role,
         );
       } else {
-        backendResponse = await _firebaseAuthService.registerWithEmail(
-          email: email, password: password, role: role, name: name,
+        response = await _authService.register(
+          email: email, 
+          password: password, 
+          role: role, 
+          name: name,
         );
       }
 
-      final token = backendResponse['token'] as String;
-      final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
-            
-      ref.read(sessionProvider.notifier).login(token: token, role: sessionRole);
-
-      if (mounted) {
-        setState(() => _isLoading = false);
-        context.go(_isWorker ? '/worker/dashboard' : '/home');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Authentication failed: $e'), backgroundColor: AppColors.emergencyRed),
-        );
-      }
-    }
-  }
-
-  Future<void> _signInWithGoogle() async {
-    setState(() => _isLoading = true);
-    try {
-      final role = _isWorker ? 'worker' : 'user';
-      final response = await _firebaseAuthService.signInWithGoogle(role: role);
-      
       final token = response['token'] as String;
+      final user = response['user'] as Map<String, dynamic>;
       final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
             
       ref.read(sessionProvider.notifier).login(
-        token: token,
+        token: token, 
         role: sessionRole,
+        name: user['name'],
+        phone: user['phone'],
       );
 
       if (mounted) {
@@ -231,7 +133,93 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.toString()), backgroundColor: AppColors.emergencyRed),
+          SnackBar(
+            content: Text(e.toString()), 
+            backgroundColor: AppColors.emergencyRed,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _submitEmail,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
+    setState(() => _isLoading = true);
+    try {
+      final role = _isWorker ? 'worker' : 'user';
+      
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: '926338625536-gbuohg1dtq81n42fnmhefqc5qno94n62.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
+      
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final User? user = userCredential.user;
+      
+      if (user == null) throw Exception('Google sign-in failed: No user found');
+
+      final String? idToken = await user.getIdToken(true);
+      if (idToken == null) throw Exception('Failed to get ID token');
+
+      final response = await _authService.loginWithGoogle(
+        firebaseIdToken: idToken,
+        role: role,
+        email: user.email ?? googleUser.email,
+        name: user.displayName ?? googleUser.displayName,
+        photoUrl: user.photoURL,
+        firebaseUid: user.uid,
+      );
+      
+      final token = response['token'] as String;
+      final userData = response['user'] as Map<String, dynamic>;
+      final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
+            
+      ref.read(sessionProvider.notifier).login(
+        token: token,
+        role: sessionRole,
+        name: userData['name'],
+        email: userData['email'],
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        context.go(_isWorker ? '/worker/dashboard' : '/home');
+      }
+    } catch (e) {
+      // Ignore if user cancelled
+      if (e.toString().contains('cancelled') || e.toString().contains('canceled')) {
+        setState(() => _isLoading = false);
+        return;
+      }
+      
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()), 
+            backgroundColor: AppColors.emergencyRed,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _signInWithGoogle,
+            ),
+          ),
         );
       }
     }
@@ -299,7 +287,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'We\'ll send you a secure OTP via SMS',
+                    _isEmailMethod ? 'Secure login using email' : 'Phone login temporarily unavailable',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
                   ),
                   const SizedBox(height: 20),
@@ -318,16 +306,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 10),
                   
-                  // Authentication Method Switcher
-                  Center(
-                    child: TextButton(
-                      onPressed: () => setState(() => _isEmailMethod = !_isEmailMethod),
-                      child: Text(
-                        _isEmailMethod ? 'Use Phone Number instead' : 'Use Email & Password instead',
-                        style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
-                      ),
-                    ),
-                  ),
                   const SizedBox(height: 16),
 
                   if (!_isEmailMethod) ...[
@@ -372,6 +350,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       obscureText: true,
                       decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
                     ),
+                    if (_isLoginMode)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _forgotPassword,
+                          child: const Text('Forgot Password?'),
+                        ),
+                      ),
                   ],
                   
                   const SizedBox(height: 10),

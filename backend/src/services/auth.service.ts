@@ -77,6 +77,10 @@ export const googleLoginSchema = z.object({
   deviceId: z.string().max(180).optional()
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email(),
+});
+
 type RegisterInput = z.infer<typeof registerSchema>;
 type LoginInput = z.infer<typeof loginSchema>;
 type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
@@ -174,59 +178,59 @@ export async function checkUser(input: { phone?: string; email?: string }) {
 }
 
 export async function register(input: RegisterInput) {
+  if (!input.email) {
+    throw httpError(400, 'Email is required for registration');
+  }
+
+  // Check if user already exists
+  const existingUser = await query('SELECT id FROM users WHERE email = $1', [input.email]);
+  if (existingUser.rows.length > 0) {
+    throw httpError(409, 'Account already exists');
+  }
+
   const passwordHash = input.password ? await bcrypt.hash(input.password, 12) : null;
+  const phone = input.phone || '';
+  const language = 'en';
+  const isActive = true;
 
   if (input.role === 'worker') {
     await query(
-      `INSERT INTO workers (name, phone, category, experience)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (phone) DO UPDATE
+      `INSERT INTO workers (name, phone, category, experience, email, password_hash)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (email) DO UPDATE
        SET name = COALESCE(EXCLUDED.name, workers.name),
+           phone = COALESCE(EXCLUDED.phone, workers.phone),
            category = COALESCE(EXCLUDED.category, workers.category),
-           experience = EXCLUDED.experience`,
-      [input.name ?? 'Worker', input.phone, input.category ?? null, input.experience ?? 0]
+           experience = EXCLUDED.experience,
+           password_hash = COALESCE(EXCLUDED.password_hash, workers.password_hash)`,
+      [input.name ?? 'Worker', phone, input.category ?? null, input.experience ?? 0, input.email, passwordHash]
     );
 
-    // If skills provided, link to categories
-    if (input.skills?.length) {
-      const worker = await query<{ id: string }>('SELECT id FROM workers WHERE phone = $1', [input.phone]);
-      const workerId = worker.rows[0]?.id;
-      if (workerId) {
-        for (const skill of input.skills) {
-          await query(
-            `INSERT INTO worker_skills (worker_id, category_id)
-             SELECT $1, id FROM categories WHERE LOWER(name) = LOWER($2) OR LOWER(ai_label) = LOWER($2)
-             ON CONFLICT DO NOTHING`,
-            [workerId, skill]
-          );
-        }
-      }
-    }
+    const workerResult = await query<{id: string; email: string; role: string}>(
+      'SELECT id, email, $1::text as role FROM workers WHERE email = $2',
+      ['worker', input.email]
+    );
+    const worker = workerResult.rows[0];
+    const token = signToken({ sub: worker.id, role: 'worker', email: worker.email });
+
+    return { token, user: { ...worker, name: input.name } };
+
   } else {
     await query(
-      `INSERT INTO users (name, phone, email, password_hash, role)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (phone) DO UPDATE
-       SET name = COALESCE(EXCLUDED.name, users.name),
-           email = COALESCE(EXCLUDED.email, users.email),
-           password_hash = COALESCE(EXCLUDED.password_hash, users.password_hash)`,
-      [input.name ?? null, input.phone, input.email ?? null, passwordHash, 'user']
+      `INSERT INTO users (name, phone, email, password_hash, role, is_active, language)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      [input.name ?? null, phone, input.email, passwordHash, 'user', isActive, language]
     );
+
+    const userResult = await query<{id: string; email: string; role: string}>(
+      'SELECT id, email, role FROM users WHERE email = $1',
+      [input.email]
+    );
+    const user = userResult.rows[0];
+    const token = signToken({ sub: user.id, role: 'user', email: user.email });
+
+    return { token, user: { ...user, name: input.name } };
   }
-
-  if (config.twilioEnabled && config.twilioVerifyServiceSid) {
-    await sendTwilioVerifyOtp(input.phone);
-    return { message: 'OTP sent' };
-  }
-
-  const otp = createOtp();
-  await storeOtp(input.role, input.phone, otp);
-  await sendOtpSms(input.phone, otp);
-
-  return {
-    message: 'OTP sent',
-    devOtp: config.nodeEnv === 'production' ? undefined : otp
-  };
 }
 
 export async function login(input: LoginInput) {
@@ -248,52 +252,38 @@ export async function login(input: LoginInput) {
     return { token, role: 'admin' };
   }
 
-  if (!input.phone) {
-    if (input.email && input.password) {
-      const table = input.role === 'worker' ? 'workers' : 'users';
-      
-      const result = await query<{ id: string; email: string; password_hash: string; phone: string }>(
-        `SELECT id, email, password_hash, phone FROM ${table} WHERE email = $1`,
-        [input.email]
-      );
-      
-      const account = result.rows[0];
-      if (!account || !account.password_hash || !(await bcrypt.compare(input.password, account.password_hash))) {
-        throw httpError(401, 'Invalid email or password');
-      }
-
-      const token = signToken({
-        sub: account.id,
-        role: input.role,
-        phone: account.phone,
-        email: account.email,
-        deviceId: input.deviceId
-      });
-
-      return { token, role: input.role, accountId: account.id };
-    }
-    throw httpError(400, 'Phone number or email/password is required');
+  if (!input.email || !input.password) {
+    throw httpError(400, 'Email and password are required');
   }
 
   const table = input.role === 'worker' ? 'workers' : 'users';
-  const result = await query<{ id: string }>(`SELECT id FROM ${table} WHERE phone = $1`, [input.phone]);
-
-  if (!result.rows[0]) {
-    throw httpError(404, `${input.role} not found. Register first.`);
+  const result = await query<{ id: string; email: string; password_hash: string; phone: string; name: string }>(
+    `SELECT id, email, password_hash, phone, name FROM ${table} WHERE email = $1`,
+    [input.email]
+  );
+  
+  const account = result.rows[0];
+  if (!account || !account.password_hash || !(await bcrypt.compare(input.password, account.password_hash))) {
+    throw httpError(401, 'Invalid email or password');
   }
 
-  if (config.twilioEnabled && config.twilioVerifyServiceSid) {
-    await sendTwilioVerifyOtp(input.phone);
-    return { message: 'OTP sent' };
-  }
+  const token = signToken({
+    sub: account.id,
+    role: input.role,
+    phone: account.phone,
+    email: account.email,
+    deviceId: input.deviceId
+  });
 
-  const otp = createOtp();
-  await storeOtp(input.role, input.phone, otp);
-  await sendOtpSms(input.phone, otp);
-
-  return {
-    message: 'OTP sent',
-    devOtp: config.nodeEnv === 'production' ? undefined : otp
+  return { 
+    token, 
+    user: {
+      id: account.id,
+      email: account.email,
+      name: account.name,
+      phone: account.phone,
+      role: input.role
+    }
   };
 }
 
@@ -387,64 +377,57 @@ export async function firebaseLogin(input: FirebaseLoginInput) {
     throw httpError(400, 'Firebase token is required');
   }
   const identity = await verifyFirebaseIdToken(tokenToUse);
-  let phone = (input.phone ?? identity.phone)?.trim();
-  if (!phone) {
-    if (identity.email) {
-      phone = firebaseSyntheticPhone(identity.uid);
-    } else {
-      throw httpError(
-        400,
-        'Firebase account must include a verified email or phone number.'
-      );
-    }
+  const email = (input.email ?? identity.email)?.trim();
+  
+  if (!email) {
+    throw httpError(400, 'Firebase account must include a verified email.');
   }
 
   if (input.role === 'worker') {
-    const result = await query<{ id: string; phone: string }>(
-      `INSERT INTO workers (name, phone, category, experience)
+    const result = await query<{ id: string; email: string; name: string }>(
+      `INSERT INTO workers (name, email, firebase_uid, profile_image)
        VALUES ($1, $2, $3, $4)
-       ON CONFLICT (phone) DO UPDATE
+       ON CONFLICT (email) DO UPDATE
        SET name = COALESCE(EXCLUDED.name, workers.name),
-           category = COALESCE(EXCLUDED.category, workers.category),
-           experience = EXCLUDED.experience
-       RETURNING id, phone`,
-      [input.name ?? identity.name ?? 'Worker', phone, input.category ?? null, input.experience ?? 0]
+           firebase_uid = COALESCE(EXCLUDED.firebase_uid, workers.firebase_uid),
+           profile_image = COALESCE(EXCLUDED.profile_image, workers.profile_image)
+       RETURNING id, email, name`,
+      [input.name ?? identity.name ?? 'Worker', email, identity.uid, identity.picture ?? null]
     );
 
     const account = result.rows[0];
     const token = signToken({
       sub: account.id,
       role: 'worker',
-      phone: account.phone,
+      email: account.email,
       deviceId: input.deviceId,
       firebaseUid: identity.uid
     });
 
-    return { token, role: 'worker', accountId: account.id, firebaseUid: identity.uid };
+    return { token, user: { ...account, role: 'worker' } };
   }
 
-  const userResult = await query<{ id: string; phone: string; email: string | null }>(
-    `INSERT INTO users (name, phone, email, profile_image, role)
+  const userResult = await query<{ id: string; email: string; name: string }>(
+    `INSERT INTO users (name, email, firebase_uid, profile_image, role)
      VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (phone) DO UPDATE
+     ON CONFLICT (email) DO UPDATE
      SET name = COALESCE(EXCLUDED.name, users.name),
-         email = COALESCE(EXCLUDED.email, users.email),
+         firebase_uid = COALESCE(EXCLUDED.firebase_uid, users.firebase_uid),
          profile_image = COALESCE(EXCLUDED.profile_image, users.profile_image)
-     RETURNING id, phone, email`,
-    [input.name ?? identity.name ?? null, phone, input.email ?? identity.email ?? null, identity.picture ?? null, 'user']
+     RETURNING id, email, name`,
+    [input.name ?? identity.name ?? null, email, identity.uid, identity.picture ?? null, 'user']
   );
 
   const user = userResult.rows[0];
   const token = signToken({
     sub: user.id,
     role: 'user',
-    phone: user.phone,
-    email: user.email ?? identity.email,
+    email: user.email,
     deviceId: input.deviceId,
     firebaseUid: identity.uid
   });
 
-  return { token, role: 'user', accountId: user.id, firebaseUid: identity.uid };
+  return { token, user: { ...user, role: 'user' } };
 }
 
 export async function logout() {
@@ -471,49 +454,53 @@ export async function googleLogin(input: GoogleLoginInput) {
     return { token, user: { id: admin.id, name: admin.name, email: admin.email, role: 'admin' } };
   }
 
-  const phone = firebaseSyntheticPhone(input.firebaseUid);
-
-  if (input.role === 'worker') {
-    const result = await query<{ id: string; name: string; email: string }>(
-      `INSERT INTO workers (name, phone, category, experience)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (phone) DO UPDATE
-       SET name = COALESCE(EXCLUDED.name, workers.name)
-       RETURNING id, name`,
-      [input.name ?? 'Worker', phone, null, 0]
-    );
-
-    const account = result.rows[0];
-    const token = signToken({
-      sub: account.id,
-      role: 'worker',
-      phone: phone,
-      deviceId: input.deviceId,
-      firebaseUid: input.firebaseUid
-    });
-    return { token, user: { id: account.id, name: account.name, email: input.email, role: 'worker' } };
-  }
-
-  const userResult = await query<{ id: string; name: string; email: string }>(
-    `INSERT INTO users (name, phone, email, profile_image, role)
+  const table = input.role === 'worker' ? 'workers' : 'users';
+  const result = await query<{ id: string; name: string; email: string }>(
+    `INSERT INTO ${table} (name, email, firebase_uid, profile_image, role)
      VALUES ($1, $2, $3, $4, $5)
-     ON CONFLICT (phone) DO UPDATE
-     SET name = COALESCE(EXCLUDED.name, users.name),
-         email = COALESCE(EXCLUDED.email, users.email),
-         profile_image = COALESCE(EXCLUDED.profile_image, users.profile_image)
+     ON CONFLICT (email) DO UPDATE
+     SET name = COALESCE(EXCLUDED.name, ${table}.name),
+         firebase_uid = COALESCE(EXCLUDED.firebase_uid, ${table}.firebase_uid),
+         profile_image = COALESCE(EXCLUDED.profile_image, ${table}.profile_image)
      RETURNING id, name, email`,
-    [input.name ?? null, phone, input.email, input.photoUrl ?? null, 'user']
+    [input.name ?? (input.role === 'worker' ? 'Worker' : null), input.email, input.firebaseUid, input.photoUrl ?? null, input.role]
   );
 
-  const user = userResult.rows[0];
+  const account = result.rows[0];
   const token = signToken({
-    sub: user.id,
-    role: 'user',
-    phone: phone,
-    email: user.email,
+    sub: account.id,
+    role: input.role,
+    email: account.email,
     deviceId: input.deviceId,
     firebaseUid: input.firebaseUid
   });
 
-  return { token, user: { id: user.id, name: user.name, email: user.email, role: 'user' } };
+  return { token, user: { ...account, role: input.role } };
+}
+
+export async function forgotPassword(input: { email: string }) {
+  const user = await query('SELECT id FROM users WHERE email = $1', [input.email]);
+  const worker = await query('SELECT id FROM workers WHERE email = $1', [input.email]);
+  
+  if (user.rows.length === 0 && worker.rows.length === 0) {
+    throw httpError(404, 'No account found');
+  }
+
+  // In a real app, send email here. For now, simulate success.
+  return { message: 'Password reset email sent' };
+}
+
+export async function getMe(userId: string, role: string) {
+  const table = role === 'worker' ? 'workers' : 'users';
+  const result = await query<{ id: string; email: string; name: string; phone: string; role: string; is_active: boolean; profile_image: string }>(
+    `SELECT id, email, name, phone, role, is_active, profile_image FROM ${table} WHERE id = $1`,
+    [userId]
+  );
+  
+  const account = result.rows[0];
+  if (!account) {
+    throw httpError(404, 'User not found');
+  }
+
+  return { user: account };
 }
