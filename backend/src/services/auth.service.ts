@@ -15,7 +15,7 @@ const otpMemoryStore = new Map<string, { otp: string; expiresAt: number; attempt
 export const registerSchema = z.object({
   role: z.enum(['user', 'worker']).default('user'),
   name: z.string().min(2).max(120).optional(),
-  phone: z.string().min(8).max(20),
+  phone: z.string().min(8).max(20).optional(),
   email: z.preprocess((val) => (val === '' || val === null || val === undefined ? undefined : val), z.string().email().optional()),
   password: z.string().min(8).optional(),
   category: z.string().max(80).optional(),
@@ -189,7 +189,7 @@ export async function register(input: RegisterInput) {
   }
 
   const passwordHash = input.password ? await bcrypt.hash(input.password, 12) : null;
-  const phone = input.phone || '';
+  const phone = input.phone || null;
   const language = 'en';
   const isActive = true;
 

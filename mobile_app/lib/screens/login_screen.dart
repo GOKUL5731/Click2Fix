@@ -7,6 +7,8 @@ import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../services/firebase_phone_auth_service.dart';
 import '../widgets/primary_action_button.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
