@@ -6,6 +6,8 @@ import '../providers/session_provider.dart';
 import '../services/api_client.dart';
 import '../services/auth_service.dart';
 import '../widgets/primary_action_button.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
@@ -16,38 +18,209 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _phoneController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _nameController = TextEditingController();
+
   final _apiClient = ApiClient();
   late final _authService = AuthService(_apiClient);
+  
   bool _isWorker = false;
   bool _isLoading = false;
+  bool _isLoginMode = true; // true = Login, false = Register
+  bool _isEmailMethod = true; // Set to true as default
 
   @override
   void dispose() {
     _phoneController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _nameController.dispose();
     super.dispose();
   }
 
   Future<void> _sendOtp() async {
-    final phone = _phoneController.text.trim();
-    if (phone.length < 10) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Phone login temporarily unavailable. Please use Email or Google login.')),
+    );
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty || !email.contains('@')) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a valid phone number')),
+        const SnackBar(content: Text('Please enter your email to reset password')),
       );
       return;
     }
+
+    setState(() => _isLoading = true);
+    try {
+      await _authService.forgotPassword(email);
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Password reset email sent')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(e.toString())),
+        );
+      }
+    }
+  }
+
+  Future<void> _submitEmail() async {
+    final email = _emailController.text.trim();
+    final password = _passwordController.text.trim();
+    final name = _nameController.text.trim();
+
+    if (email.isEmpty || password.length < 6) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please provide a valid email and 6+ char password')),
+      );
+      return;
+    }
+
+    if (!_isLoginMode && name.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please provide your name to register')),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      final role = _isWorker ? 'worker' : 'user';
+      Map<String, dynamic> response;
+
+      if (_isLoginMode) {
+        response = await _authService.loginWithEmail(
+          email: email, 
+          password: password, 
+          role: role,
+        );
+      } else {
+        response = await _authService.register(
+          email: email, 
+          password: password, 
+          role: role, 
+          name: name,
+        );
+      }
+
+      final token = response['token'] as String;
+      final user = response['user'] as Map<String, dynamic>;
+      final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
+            
+      ref.read(sessionProvider.notifier).login(
+        token: token, 
+        role: sessionRole,
+        name: user['name'],
+        phone: user['phone'],
+        email: user['email'],
+      );
+
+      if (mounted) {
+        setState(() => _isLoading = false);
+        context.go(_isWorker ? '/worker/dashboard' : '/home');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()), 
+            backgroundColor: AppColors.emergencyRed,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _submitEmail,
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _signInWithGoogle() async {
     setState(() => _isLoading = true);
     try {
       final role = _isWorker ? 'worker' : 'user';
-      await _authService.loginWithPhone(phone, role: role);
+      
+      final GoogleSignIn googleSignIn = GoogleSignIn(
+        serverClientId: '926338625536-gbuohg1dtq81n42fnmhefqc5qno94n62.apps.googleusercontent.com',
+        scopes: ['email', 'profile'],
+      );
+      
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final UserCredential userCredential = await FirebaseAuth.instance.signInWithCredential(credential);
+      final User? user = userCredential.user;
+      
+      if (user == null) throw Exception('Google sign-in failed: No user found');
+
+      final String? idToken = await user.getIdToken(true);
+      if (idToken == null) throw Exception('Failed to get ID token');
+
+      final response = await _authService.loginWithGoogle(
+        firebaseIdToken: idToken,
+        role: role,
+        email: user.email ?? googleUser.email,
+        name: user.displayName ?? googleUser.displayName,
+        photoUrl: user.photoURL,
+        firebaseUid: user.uid,
+      );
+      
+      final token = response['token'] as String;
+      final userData = response['user'] as Map<String, dynamic>;
+      final sessionRole = _isWorker ? UserRole.worker : UserRole.user;
+            
+      ref.read(sessionProvider.notifier).login(
+        token: token,
+        role: sessionRole,
+        name: userData['name'],
+        email: userData['email'],
+      );
+
       if (mounted) {
         setState(() => _isLoading = false);
-        context.go('/otp', extra: {'phone': phone, 'isWorker': _isWorker});
+        context.go(_isWorker ? '/worker/dashboard' : '/home');
       }
     } catch (e) {
-      // Fallback: proceed to OTP screen even if API is unavailable (dev mode)
+      // Ignore if user cancelled
+      if (e.toString().contains('cancelled') || e.toString().contains('canceled')) {
+        setState(() => _isLoading = false);
+        return;
+      }
+      
       if (mounted) {
         setState(() => _isLoading = false);
-        context.go('/otp', extra: {'phone': phone, 'isWorker': _isWorker});
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(e.toString()), 
+            backgroundColor: AppColors.emergencyRed,
+            action: SnackBarAction(
+              label: 'Retry',
+              textColor: Colors.white,
+              onPressed: _signInWithGoogle,
+            ),
+          ),
+        );
       }
     }
   }
@@ -73,8 +246,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               ),
               child: Column(
                 children: [
-                  // Logo
-                  Container(
+                   Container(
                     width: 72,
                     height: 72,
                     decoration: BoxDecoration(
@@ -96,7 +268,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'Click the problem. Fix it instantly.',
+                    _isEmailMethod ? 'Secure login using email' : 'Phone login temporarily unavailable',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.white70),
                   ),
                 ],
@@ -110,15 +282,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Login or Register',
+                    _isLoginMode ? 'Login to Account' : 'Create New Account',
                     style: Theme.of(context).textTheme.headlineSmall,
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'We\'ll send you a one-time verification code',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
-                  ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 20),
                   // Role toggle
                   Container(
                     decoration: BoxDecoration(
@@ -132,38 +299,74 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       ],
                     ),
                   ),
-                  const SizedBox(height: 24),
-                  // Phone field
-                  TextField(
-                    controller: _phoneController,
-                    keyboardType: TextInputType.phone,
-                    style: Theme.of(context).textTheme.bodyLarge,
-                    decoration: InputDecoration(
-                      labelText: 'Mobile Number',
-                      hintText: '9876543210',
-                      prefixIcon: const Padding(
-                        padding: EdgeInsets.only(left: 16, right: 8),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text('🇮🇳', style: TextStyle(fontSize: 20)),
-                            SizedBox(width: 6),
-                            Text('+91', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
-                          ],
+                  const SizedBox(height: 10),
+                  
+                  const SizedBox(height: 16),
+
+                  if (!_isEmailMethod) ...[
+                    // Phone field (Disabled in UI logic current but kept for layout)
+                    TextField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(labelText: 'Mobile Number', prefixIcon: Icon(Icons.phone_outlined)),
+                    ),
+                  ] else ...[
+                    if (!_isLoginMode) ...[
+                      TextField(
+                        controller: _nameController,
+                        decoration: const InputDecoration(labelText: 'Full Name', prefixIcon: Icon(Icons.person_outline)),
+                      ),
+                      const SizedBox(height: 16),
+                    ],
+                    TextField(
+                      controller: _emailController,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration: const InputDecoration(labelText: 'Email Address', prefixIcon: Icon(Icons.email_outlined)),
+                    ),
+                    const SizedBox(height: 16),
+                    TextField(
+                      controller: _passwordController,
+                      obscureText: true,
+                      decoration: const InputDecoration(labelText: 'Password', prefixIcon: Icon(Icons.lock_outline)),
+                    ),
+                    if (_isLoginMode)
+                      Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton(
+                          onPressed: _forgotPassword,
+                          child: const Text('Forgot Password?'),
                         ),
                       ),
-                      prefixIconConstraints: const BoxConstraints(minWidth: 0, minHeight: 0),
+                  ],
+                  
+                  const SizedBox(height: 10),
+                  
+                  // Register / Login Switcher
+                  Center(
+                    child: TextButton(
+                      onPressed: () {
+                        setState(() {
+                          _isLoginMode = !_isLoginMode;
+                        });
+                      },
+                      child: Text(
+                        _isLoginMode ? 'New user? Register here' : 'Already have an account? Login',
+                        style: TextStyle(fontWeight: FontWeight.w600, color: AppColors.primaryBlue),
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 28),
-                  // Send OTP button
+
+                  const SizedBox(height: 16),
+                  
                   PrimaryActionButton(
-                    label: 'Send OTP',
-                    icon: Icons.sms_outlined,
+                    label: _isLoginMode ? 'Login' : 'Register',
+                    icon: _isEmailMethod ? Icons.email_outlined : Icons.sms_outlined,
                     isLoading: _isLoading,
-                    onPressed: _sendOtp,
+                    onPressed: _isEmailMethod ? _submitEmail : _sendOtp,
                   ),
-                  const SizedBox(height: 20),
+                  
+                  const SizedBox(height: 24),
+                  
                   // Divider
                   Row(
                     children: [
@@ -171,68 +374,23 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Text(
-                          'Demo Mode',
+                          'OR',
                           style: Theme.of(context).textTheme.labelSmall?.copyWith(color: AppColors.textHint),
                         ),
                       ),
                       const Expanded(child: Divider()),
                     ],
                   ),
-                  const SizedBox(height: 16),
-                  // Quick demo buttons
-                  Row(
-                    children: [
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            ref.read(sessionProvider.notifier).login(
-                                  token: 'demo-user-token',
-                                  role: UserRole.user,
-                                  phone: '9876543210',
-                                  name: 'Demo User',
-                                );
-                            context.go('/home');
-                          },
-                          icon: const Icon(Icons.person, size: 18),
-                          label: const Text('Demo User'),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            ref.read(sessionProvider.notifier).login(
-                                  token: 'demo-worker-token',
-                                  role: UserRole.worker,
-                                  phone: '9876543211',
-                                  name: 'Demo Worker',
-                                );
-                            context.go('/worker/dashboard');
-                          },
-                          icon: const Icon(Icons.engineering, size: 18),
-                          label: const Text('Demo Worker'),
-                        ),
-                      ),
-                    ],
-                  ),
                   const SizedBox(height: 20),
-                  // Register link
-                  Center(
-                    child: TextButton(
-                      onPressed: () => context.go('/register'),
-                      child: const Text('New user? Register here'),
-                    ),
+                  
+                  PrimaryActionButton(
+                    label: 'Continue with Google',
+                    icon: Icons.g_mobiledata,
+                    isLoading: _isLoading,
+                    onPressed: _signInWithGoogle,
                   ),
-                  const SizedBox(height: 16),
-                  // Footer
-                  Center(
-                    child: Text(
-                      'By continuing, you agree to our Terms of Service\nand Privacy Policy',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textHint),
-                      textAlign: TextAlign.center,
-                    ),
-                  ),
-                  const SizedBox(height: 24),
+                  
+                  const SizedBox(height: 40),
                 ],
               ),
             ),

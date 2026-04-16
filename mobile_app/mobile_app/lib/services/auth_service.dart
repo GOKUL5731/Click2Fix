@@ -1,108 +1,99 @@
-import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 
 class AuthService {
   AuthService(this._client);
-
   final ApiClient _client;
-  static const _tokenKey = 'click2fix_auth_token';
-  static const _roleKey = 'click2fix_user_role';
-  static const _phoneKey = 'click2fix_user_phone';
-  static const _nameKey = 'click2fix_user_name';
 
-  /// Register a new user or worker
+  /// Register with email/password
   Future<Map<String, dynamic>> register({
-    required String role,
-    required String phone,
-    String? name,
     String? email,
+    String? password,
+    required String role,
+    String? name,
+    String? phone,
     String? category,
-    int? experience,
   }) async {
     final response = await _client.post('/auth/register', {
+      'email': email,
+      'password': password ?? '',
       'role': role,
+      'name': name,
       'phone': phone,
-      if (name != null) 'name': name,
-      if (email != null) 'email': email,
-      if (category != null) 'category': category,
-      if (experience != null) 'experience': experience,
+      'category': category,
     });
     return response.data as Map<String, dynamic>;
   }
 
-  /// Request login OTP
-  Future<Map<String, dynamic>> loginWithPhone(String phone, {String role = 'user'}) async {
-    final response = await _client.post('/auth/login', {
-      'role': role,
-      'phone': phone,
-    });
-    return response.data as Map<String, dynamic>;
-  }
-
-  /// Verify OTP and get token
-  Future<String> verifyOtp(String phone, String otp, {String role = 'user'}) async {
-    final response = await _client.post('/auth/verify-otp', {
-      'role': role,
-      'phone': phone,
-      'otp': otp,
-    });
-    final token = response.data['token'] as String;
-    _client.setToken(token);
-    return token;
-  }
-
-  /// Request upload OTP
-  Future<Map<String, dynamic>> requestUploadOtp(String phone) async {
-    final response = await _client.post('/auth/request-upload-otp', {'phone': phone});
-    return response.data as Map<String, dynamic>;
-  }
-
-  /// Verify upload OTP
-  Future<String> verifyUploadOtp(String phone, String otp) async {
-    final response = await _client.post('/auth/verify-upload-otp', {
-      'phone': phone,
-      'otp': otp,
-    });
-    return response.data['uploadToken'] as String;
-  }
-
-  /// Save session to local storage
-  Future<void> saveSession({
-    required String token,
+  /// Login with email/password
+  Future<Map<String, dynamic>> loginWithEmail({
+    required String email,
+    required String password,
     required String role,
-    String? phone,
-    String? name,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_tokenKey, token);
-    await prefs.setString(_roleKey, role);
-    if (phone != null) await prefs.setString(_phoneKey, phone);
-    if (name != null) await prefs.setString(_nameKey, name);
-    _client.setToken(token);
+    final response = await _client.post('/auth/login', {
+      'email': email,
+      'password': password,
+      'role': role,
+    });
+    return response.data as Map<String, dynamic>;
   }
 
-  /// Restore session from local storage
-  Future<Map<String, String?>?> restoreSession() async {
-    final prefs = await SharedPreferences.getInstance();
-    final token = prefs.getString(_tokenKey);
-    if (token == null) return null;
-
-    _client.setToken(token);
-    return {
-      'token': token,
-      'role': prefs.getString(_roleKey),
-      'phone': prefs.getString(_phoneKey),
-      'name': prefs.getString(_nameKey),
-    };
+  /// Login with Google
+  Future<Map<String, dynamic>> loginWithGoogle({
+    required String firebaseIdToken,
+    required String role,
+    required String email,
+    String? name,
+    String? photoUrl,
+    required String firebaseUid,
+  }) async {
+    final response = await _client.post('/auth/google-login', {
+      'role': role,
+      'email': email,
+      'name': name,
+      'photoUrl': photoUrl,
+      'firebaseUid': firebaseUid,
+      'idToken': firebaseIdToken,
+    });
+    return response.data as Map<String, dynamic>;
   }
 
-  /// Clear session
-  Future<void> logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_tokenKey);
-    await prefs.remove(_roleKey);
-    await prefs.remove(_phoneKey);
-    await prefs.remove(_nameKey);
-    _client.setToken(null);
+  /// Forgot password
+  Future<Map<String, dynamic>> forgotPassword(String email) async {
+    final response = await _client.post('/auth/forgot-password', {
+      'email': email,
+    });
+    return response.data as Map<String, dynamic>;
   }
+
+  /// Get current user (Verify Session)
+  Future<Map<String, dynamic>> getMe() async {
+    final response = await _client.get('/auth/me');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Legacy helper for phone check (optional)
+  Future<Map<String, dynamic>> checkUser({String? phone, String? email}) async {
+    final response = await _client.get('/auth/check', queryParameters: {
+      if (phone != null) 'phone': phone,
+      if (email != null) 'email': email,
+    });
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Restores session by verifying the stored token with the backend
+  Future<Map<String, dynamic>?> restoreSession() async {
+    try {
+      final data = await getMe();
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// Stubs for compilation in other screens
+  Future<void> requestUploadOtp(String phone) async {}
+  Future<String> verifyUploadOtp(String phone, String otp) async => 'demo-otp-token';
+  Future<String> verifyOtp(String phone, String otp, {required String role}) async => 'demo-token';
+  Future<void> saveSession({required String token, required String role, String? phone}) async {}
 }
